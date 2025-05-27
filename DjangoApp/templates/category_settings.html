@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Category Settings</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f7f7f7; }
+
+        nav button {
+            margin-right: 10px;
+            padding: 10px 20px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        nav button:hover {
+            background-color: #0056b3;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        input[type="text"], input[type="color"] {
+            width: 90%;
+            padding: 6px;
+            margin: 5px 0;
+        }
+
+        button {
+            padding: 6px 12px;
+            margin: 2px;
+            border: none;
+            border-radius: 4px;
+            background: #28a745;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        .action-button {
+            background: #007bff;
+        }
+
+        .action-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/stream/">
+            <button>⬅ Back to Stream Control</button>
+        </a>
+    </nav>
+
+    <div class="card">
+        <h1>Налаштування категорій</h1>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Label</th>
+                    <th>Description</th>
+                    <th>Color</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="category-body"></tbody>
+        </table>
+
+        <h2 style="margin-top: 30px;">Додати або оновити категорію</h2>
+        <form id="category-form">
+            <div style="margin-bottom: 10px;">
+            <label for="cat-id">ID:</label><br>
+            <input type="text" id="cat-id" required>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="cat-description">Description:</label><br>
+            <input type="text" id="cat-description">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+            <label for="cat-color">Color:</label><br>
+            <input type="color" id="cat-color" value="#cccccc">
+            </div>
+            <br>
+            <button type="submit">Зберегти</button>
+        </form>
+    </div>
+
+    <script>
+        function fetchCategories() {
+            fetch("/categories/")
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById("category-body");
+                    tbody.innerHTML = "";
+
+                    data.categories.forEach(cat => {
+                        const row = `
+                            <tr>
+                                <td>${cat.id}</td>
+                                <td>${cat.label}</td>
+                                <td>${cat.description}</td>
+                                <td><span style="background:${cat.color}; padding: 3px 10px;">${cat.color}</span></td>
+                                <td>
+                                    <button class="action-button" onclick="fillForm('${cat.id}', '${cat.description}', '${cat.color}')">Edit</button>
+                                    <button onclick="deleteCategory('${cat.id}')">Delete</button>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                });
+        }
+
+        function fillForm(id, desc, color) {
+            document.getElementById("cat-id").value = id;
+            document.getElementById("cat-description").value = desc;
+            document.getElementById("cat-color").value = color;
+        }
+
+        function deleteCategory(id) {
+            if (!confirm("Are you sure you want to delete metadata for category " + id + "?")) return;
+
+            fetch(`/categories/delete/${id}/`, { method: "DELETE" })
+                .then(res => res.json())
+                .then(() => fetchCategories());
+        }
+
+        document.getElementById("category-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            const id = document.getElementById("cat-id").value;
+            const description = document.getElementById("cat-description").value;
+            const color = document.getElementById("cat-color").value;
+
+            fetch("/categories/update/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, description, color })
+            })
+            .then(res => res.json())
+            .then(() => {
+                fetchCategories();
+                document.getElementById("category-form").reset();
+            });
+        });
+
+        fetchCategories();
+    </script>
+</body>
+</html>
+

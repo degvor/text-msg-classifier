@@ -1,0 +1,117 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: nc -z localhost 2181 || exit -1
+      start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: kafka-topics --bootstrap-server kafka:9092 --list
+      start_period: 30s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spark
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    environment:
+      - SPARK_DRIVER_MEMORY=2g
+      - SPARK_EXECUTOR_MEMORY=2g
+
+  kafka-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.producer
+    container_name: kafka-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./test_data:/test_data
+      - ./producer:/producer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    restart: unless-stopped
+
+  train-model:
+    build:
+      context: .
+      dockerfile: train_data/Dockerfile.train
+    container_name: model_trainer
+    command: spark-submit /train_data/train_classifier.py
+    volumes:
+      - ./train_data:/train_data
+      - ./data:/data
+    profiles:
+      - manual
+
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: streamdb
+      POSTGRES_USER: streamuser
+      POSTGRES_PASSWORD: streampass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  django:
+    build:
+      context: ./DjangoApp
+    container_name: django_app
+    #command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./DjangoApp:/app
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DJANGO_SETTINGS_MODULE: DjangoApp.settings
+
+volumes:
+  pg_data:

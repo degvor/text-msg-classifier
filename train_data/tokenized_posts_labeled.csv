@@ -1,0 +1,501 @@
+PostID,PostText,tokens,label
+e738e522-1c81-49eb-8193-e8ccb483c120,Нове дослідження показує зв'язок між MIT та cancer.,Нове дослідження показує зв'язок між MIT та cancer.,science
+48a3f849-d17c-4f8e-8b73-a89fadfd51f4,Surprise appearance by Brad Pitt at Brad Pitt concert.,Surprise appearance by Brad Pitt at Brad Pitt concert.,entertainment
+a79bd029-bb77-4ae8-ab81-e6930220dd06,Прорив у лікуванні NASA опублікований командою з space.,Прорив у лікуванні NASA опублікований командою з space.,science
+296798d2-699f-4edf-9ce7-8e34d4d6820d,Акції Rozetka різко зросли після logistics.,Акції Rozetka різко зросли після logistics.,business
+92b0dd5a-330e-44c6-806d-02c7fda25bc9,AI запускає оновлену версію свого Samsung.,AI запускає оновлену версію свого Samsung.,tech
+da0f0359-af91-4b07-8ec1-0ac4d6c1bff4,Olaf Scholz зустрічається з President Zelenskyy для обговорення Ukraine.,Olaf Scholz зустрічається з President Zelenskyy для обговорення Ukraine.,politics
+baeb7dce-41a6-4af1-b794-156ac3f7dd6a,NASA's mission to NASA reaches milestone.,NASA's mission to NASA reaches milestone.,science
+e6b8f282-0a9d-4f35-9f99-278a1d0e5152,Прорив у лікуванні NASA опублікований командою з climate.,Прорив у лікуванні NASA опублікований командою з climate.,science
+93e91ae7-89cd-4280-9098-7ff5a6d806b0,New study reveals link between Kyiv University and neuroscience.,New study reveals link between Kyiv University and neuroscience.,science
+42698f6d-f230-41e1-bb29-2ebd69d0597c,New sanctions imposed due to Joe Biden conflict.,New sanctions imposed due to Joe Biden conflict.,politics
+5563803c-0712-454c-b3a2-009f8ab255f7,Monatik cancels tour amid Okean Elzy concerns.,Monatik cancels tour amid Okean Elzy concerns.,entertainment
+1311568e-ee9b-4100-8b78-7dc40b9af142,Okean Elzy cancels tour amid Brad Pitt concerns.,Okean Elzy cancels tour amid Brad Pitt concerns.,entertainment
+5ca55b66-9ae9-48f3-897c-a24771d42a59,Dua Lipa оголошує про новий фільм з Taylor Swift.,Dua Lipa оголошує про новий фільм з Taylor Swift.,entertainment
+ae3fff80-8207-4609-8ad5-2c5a8e3ebe67,Несподівана поява Brad Pitt на концерті Taylor Swift.,Несподівана поява Brad Pitt на концерті Taylor Swift.,entertainment
+e1a62c89-82d9-4955-a450-e99028824d52,Rumors about Taylor Swift spark debate on social media.,Rumors about Taylor Swift spark debate on social media.,entertainment
+6d67965d-f1a3-415f-a7d2-81a9efa329a9,Government plans reforms in Olaf Scholz sector.,Government plans reforms in Olaf Scholz sector.,politics
+99fcef64-e7b3-4c1f-bed1-1cf6dde005f5,President Zelenskyy попереджає про напруження в Macron.,President Zelenskyy попереджає про напруження в Macron.,politics
+94032207-6c47-4ddb-93c1-71b5013c8671,Macron попереджає про напруження в President Zelenskyy.,Macron попереджає про напруження в President Zelenskyy.,politics
+5b1ed0a1-e546-4bd9-b079-d5c37dfafe48,Дослідники з Oxford відкрили neuroscience у сфері genetics.,Дослідники з Oxford відкрили neuroscience у сфері genetics.,science
+809b3cec-3663-43d2-b5eb-833ef09c2223,Новий прорив у сфері cybersecurity оголошено компанією OpenAI.,Новий прорив у сфері cybersecurity оголошено компанією OpenAI.,tech
+4214497d-5a5e-4cfc-8a6e-ee31196ec761,Дані показують вплив Oxford на глобальне astrophysics.,Дані показують вплив Oxford на глобальне astrophysics.,science
+ae1d38ac-0a1b-4899-9e46-bfabb06a0c4f,Новий прорив у сфері blockchain оголошено компанією Samsung.,Новий прорив у сфері blockchain оголошено компанією Samsung.,tech
+c86c92df-deae-4cda-bae8-f5ab6e90ce48,New sanctions imposed due to Olaf Scholz conflict.,New sanctions imposed due to Olaf Scholz conflict.,politics
+26dedbea-a48a-4b3a-b00d-0f7b8b8ee8c4,Експерти прогнозують рецесію в галузі Amazon.,Експерти прогнозують рецесію в галузі Amazon.,business
+0855ce5f-9baa-401d-8c2b-7f7a8ce317fe,President Zelenskyy попереджає про напруження в Joe Biden.,President Zelenskyy попереджає про напруження в Joe Biden.,politics
+461afc11-bb21-4124-9ca5-91cbdbb3d742,Стартапи залучають мільйони для розробки Ajax Systems.,Стартапи залучають мільйони для розробки Ajax Systems.,business
+b2e6033f-9862-494b-9328-117e9ed2013c,Експерти обговорюють майбутнє mobile tech в OpenAI.,Експерти обговорюють майбутнє mobile tech в OpenAI.,tech
+e3cb4cb5-ee54-49ea-9386-3b374f30e30c,cybersecurity launches upgraded version of its Apple.,cybersecurity launches upgraded version of its Apple.,tech
+0a1b4129-12ba-46ac-8a4a-ce5d4419fb16,Market reacts to Amazon earnings report.,Market reacts to Amazon earnings report.,business
+a7fec5d2-f1bc-48e7-b360-f1b20e6ea4f0,Okean Elzy cancels tour amid Taylor Swift concerns.,Okean Elzy cancels tour amid Taylor Swift concerns.,entertainment
+d1a8d416-e5f1-436d-83aa-8ceea0837823,New breakthrough in blockchain announced by SoftServe.,New breakthrough in blockchain announced by SoftServe.,tech
+5262de74-3a13-4929-8937-c16c4fd4fbbd,Акції Grammarly різко зросли після retail.,Акції Grammarly різко зросли після retail.,business
+0739bc1b-7f8e-4314-9d7b-f4141f7f1ccf,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+678bdc52-ef16-4165-b536-37f7dd91d63b,Monatik cancels tour amid Monatik concerns.,Monatik cancels tour amid Monatik concerns.,entertainment
+3f871977-cc13-47f7-b8a2-9c8c0a4b7a9b,Місія NASA до Harvard досягла важливого етапу.,Місія NASA до Harvard досягла важливого етапу.,science
+6a432796-5f3a-4a60-bc81-267a541ceefa,NASA's mission to Kyiv University reaches milestone.,NASA's mission to Kyiv University reaches milestone.,science
+a4fbdb10-2708-4b0d-bd75-da8414ef73bb,Новий прорив у сфері quantum computing оголошено компанією SoftServe.,Новий прорив у сфері quantum computing оголошено компанією SoftServe.,tech
+9dae42fa-72b8-49c3-97a5-968e44dcd870,New trade deal between Amazon and fintech finalized.,New trade deal between Amazon and fintech finalized.,business
+6c0e0238-0a31-4f86-a089-35b595962c61,Surprise appearance by Brad Pitt at Monatik concert.,Surprise appearance by Brad Pitt at Monatik concert.,entertainment
+62ce99ad-ad60-4263-9c46-d0203118fe6a,Monatik отримав нагороду на Monatik за найкращий health.,Monatik отримав нагороду на Monatik за найкращий health.,entertainment
+b75355b5-8583-48d2-9058-9d2180e779d4,Новий прорив у сфері robotics оголошено компанією Samsung.,Новий прорив у сфері robotics оголошено компанією Samsung.,tech
+61c87949-d382-4236-b4bf-2e5d63d032d3,Несподівана поява Monatik на концерті Dua Lipa.,Несподівана поява Monatik на концерті Dua Lipa.,entertainment
+9efa26c1-ded9-4da3-a0ea-50ab4b92c754,Data shows impact of Harvard on global genetics.,Data shows impact of Harvard on global genetics.,science
+733bb59b-6567-47b3-bc22-44e037e73088,Несподівана поява Brad Pitt на концерті Dua Lipa.,Несподівана поява Brad Pitt на концерті Dua Lipa.,entertainment
+79205c17-2fa1-4785-b53e-a697836e55be,blockchain reports major security flaw in Tesla.,blockchain reports major security flaw in Tesla.,tech
+9f6ae240-3a1d-4fa3-9b00-1de4bcf32378,quantum computing reports major security flaw in Samsung.,quantum computing reports major security flaw in Samsung.,tech
+f15350eb-3a16-4883-8160-928eb6e8d527,blockchain launches upgraded version of its SoftServe.,blockchain launches upgraded version of its SoftServe.,tech
+b322bf05-a94b-46dc-b24f-00ad441f57a0,Місія NASA до NASA досягла важливого етапу.,Місія NASA до NASA досягла важливого етапу.,science
+3632b4f2-156b-47ae-abcd-0f75d38c13b0,Несподівана поява Monatik на концерті Monatik.,Несподівана поява Monatik на концерті Monatik.,entertainment
+defe3c3e-ea31-42d5-8df3-fb442c06f14e,Акції Rozetka різко зросли після fintech.,Акції Rozetka різко зросли після fintech.,business
+23a790ad-170c-422a-8df6-f3e8801bf51b,quantum computing reveals cutting-edge SoftServe platform.,quantum computing reveals cutting-edge SoftServe platform.,tech
+9048f9ef-0068-4976-86ad-7707e2a6f3fa,Rumors about Dua Lipa spark debate on social media.,Rumors about Dua Lipa spark debate on social media.,entertainment
+4d3b59ea-1e32-4b32-83d5-81695a6cf002,Taylor Swift announces new movie with Dua Lipa.,Taylor Swift announces new movie with Dua Lipa.,entertainment
+290491f0-d468-4bb1-9a98-42bbf948ff9f,robotics презентувала інноваційну платформу Tesla.,robotics презентувала інноваційну платформу Tesla.,tech
+7c88a646-d2d9-4fc9-94d9-da55fdee4fcc,Стартапи залучають мільйони для розробки Google.,Стартапи залучають мільйони для розробки Google.,business
+0d6877c2-308e-43cd-a8c3-e1b77fd3a2d5,New sanctions imposed due to Olaf Scholz conflict.,New sanctions imposed due to Olaf Scholz conflict.,politics
+285e82c3-ec2a-444f-8500-426d48e47d25,President Zelenskyy warns about rising tension in Sunak.,President Zelenskyy warns about rising tension in Sunak.,politics
+2d3f4099-fb3a-4983-b9ee-b59e10d45888,Експерти обговорюють майбутнє quantum computing в Apple.,Експерти обговорюють майбутнє quantum computing в Apple.,tech
+11414018-27d5-4b30-9dca-6cb0831b75e0,quantum computing презентувала інноваційну платформу Tesla.,quantum computing презентувала інноваційну платформу Tesla.,tech
+02602a86-3bf6-4382-9980-eca6eeaaf9d3,Нову торгову угоду між Amazon та e-commerce укладено.,Нову торгову угоду між Amazon та e-commerce укладено.,business
+e62159de-e85a-42aa-aa1f-54957445e833,Government plans reforms in Joe Biden sector.,Government plans reforms in Joe Biden sector.,politics
+b7fcd1df-1604-49d7-803f-adaa1db1d595,Експерти прогнозують рецесію в галузі Silpo.,Експерти прогнозують рецесію в галузі Silpo.,business
+e4b4d56e-b173-4025-aca4-cbd8959d68bb,Market reacts to Silpo earnings report.,Market reacts to Silpo earnings report.,business
+e6c83d45-48fb-498c-bddb-89c925e0bfec,Прорив у лікуванні Kyiv University опублікований командою з astrophysics.,Прорив у лікуванні Kyiv University опублікований командою з astrophysics.,science
+716d74fa-dbf6-46bb-a8ab-b428f6b2e534,Breakthrough in Oxford treatment published by space.,Breakthrough in Oxford treatment published by space.,science
+d26f3222-e5e6-4617-b836-929df2e93cd9,Government plans reforms in Macron sector.,Government plans reforms in Macron sector.,politics
+956d5336-a9fb-415e-b165-e92116a73fe0,Rozetka sees surge in stock value after fintech.,Rozetka sees surge in stock value after fintech.,business
+4d367fec-94c6-4a89-ad30-91df658856fe,Стартапи залучають мільйони для розробки Amazon.,Стартапи залучають мільйони для розробки Amazon.,business
+92aad2eb-9491-4fae-8c35-1d8b6f3689ba,Taylor Swift оголошує про новий фільм з Brad Pitt.,Taylor Swift оголошує про новий фільм з Brad Pitt.,entertainment
+30c128a4-150c-40c7-a9fd-97c45a7e3703,robotics повідомляє про серйозну уразливість у SoftServe.,robotics повідомляє про серйозну уразливість у SoftServe.,tech
+3f8f6e90-dfa6-4267-a267-19ddf6a8479c,Lina Kostenko wins award at Lina Kostenko for best controversy.,Lina Kostenko wins award at Lina Kostenko for best controversy.,entertainment
+6d3ff05a-d624-47d7-81f5-f2ec7efacc6c,New study reveals link between NASA and cancer.,New study reveals link between NASA and cancer.,science
+5efa1900-b2d9-4396-890f-5926bc6ca48d,Startups raise millions to develop Ajax Systems.,Startups raise millions to develop Ajax Systems.,business
+18e1053c-a634-4cf5-8892-8ea7c24bca98,Парламент ухвалив суперечливий закон щодо Joe Biden.,Парламент ухвалив суперечливий закон щодо Joe Biden.,politics
+6c680bf0-8dcd-45c1-9881-320ca77f454b,Дослідники з MIT відкрили astrophysics у сфері climate.,Дослідники з MIT відкрили astrophysics у сфері climate.,science
+ab52e188-2fb1-45b8-98a4-601adf2c8ec4,New trade deal between Silpo and IT finalized.,New trade deal between Silpo and IT finalized.,business
+b2ffd1d5-bc6b-4979-bea9-ac8b317d64b9,Місія NASA до MIT досягла важливого етапу.,Місія NASA до MIT досягла важливого етапу.,science
+4f1265c4-3f84-41e9-bf55-bafa31939cb8,Дані показують вплив MIT на глобальне neuroscience.,Дані показують вплив MIT на глобальне neuroscience.,science
+f86aa1bd-f022-4ec3-8706-caef9afafafe,New sanctions imposed due to Joe Biden conflict.,New sanctions imposed due to Joe Biden conflict.,politics
+9ab9922a-492c-4ca3-94d2-d43119d9a9fa,Дослідники з Oxford відкрили neuroscience у сфері genetics.,Дослідники з Oxford відкрили neuroscience у сфері genetics.,science
+270e0472-29bd-4a19-a9c8-c5e15e802752,Несподівана поява Monatik на концерті Monatik.,Несподівана поява Monatik на концерті Monatik.,entertainment
+572b30fb-c503-4bea-8dba-0ecd6d7bf3a3,Experts discuss future of blockchain in Apple.,Experts discuss future of blockchain in Apple.,tech
+7a60d1f2-cdf7-43e3-b496-144759518650,Joe Biden попереджає про напруження в President Zelenskyy.,Joe Biden попереджає про напруження в President Zelenskyy.,politics
+8f1b371f-de54-4739-9e7a-f88e10306a0d,AI reveals cutting-edge Samsung platform.,AI reveals cutting-edge Samsung platform.,tech
+b6de43b8-2e69-43b5-ad9b-7dbc7928e7e3,NASA's mission to MIT reaches milestone.,NASA's mission to MIT reaches milestone.,science
+282486cc-2493-47af-ac48-f989278874a4,Experts discuss future of cybersecurity in SoftServe.,Experts discuss future of cybersecurity in SoftServe.,tech
+a9c1f43e-7426-45b4-b084-506491185b01,Стартапи залучають мільйони для розробки Grammarly.,Стартапи залучають мільйони для розробки Grammarly.,business
+9e1f40d3-dc94-45f9-a039-371f8d951999,Dua Lipa скасовує тур через побоювання щодо Taylor Swift.,Dua Lipa скасовує тур через побоювання щодо Taylor Swift.,entertainment
+a6ca4719-048a-4122-80b0-f515dd92f50c,Monatik cancels tour amid Dua Lipa concerns.,Monatik cancels tour amid Dua Lipa concerns.,entertainment
+5491b76e-94cb-4fdd-a864-0a62fb189707,quantum computing reports major security flaw in Meta.,quantum computing reports major security flaw in Meta.,tech
+df6d9988-3423-435f-9f7f-a98133e9e5e5,Experts predict recession in Amazon sector.,Experts predict recession in Amazon sector.,business
+dd7f8f54-6599-411d-9558-c4fac65e4eb3,Brad Pitt оголошує про новий фільм з Monatik.,Brad Pitt оголошує про новий фільм з Monatik.,entertainment
+daaa3a8c-7cd6-467b-86ef-31f68a76e87d,Taylor Swift оголошує про новий фільм з Brad Pitt.,Taylor Swift оголошує про новий фільм з Brad Pitt.,entertainment
+8c4ac2b7-6405-45f8-96de-0c79e3b9df27,Дослідники з Kyiv University відкрили climate у сфері climate.,Дослідники з Kyiv University відкрили climate у сфері climate.,science
+f009bfd4-bac3-4ab3-aa5d-e37de031f9c9,Акції Rozetka різко зросли після logistics.,Акції Rozetka різко зросли після logistics.,business
+9b58ed4b-baf2-4625-9a15-5fc09b0f3d0c,Monatik wins award at Okean Elzy for best performance.,Monatik wins award at Okean Elzy for best performance.,entertainment
+bca88851-4b6d-4882-b10d-aafce621b1de,Акції Ajax Systems різко зросли після fintech.,Акції Ajax Systems різко зросли після fintech.,business
+1857fead-0669-44dc-99cc-7fa93397d345,Data shows impact of Harvard on global neuroscience.,Data shows impact of Harvard on global neuroscience.,science
+c87b3cf5-7a10-45d3-bf3d-ed84693ad7c2,Чутки про Dua Lipa викликають резонанс у соцмережах.,Чутки про Dua Lipa викликають резонанс у соцмережах.,entertainment
+0cbd55c1-3b0b-438c-ba33-fe1428e6a548,Breakthrough in Harvard treatment published by neuroscience.,Breakthrough in Harvard treatment published by neuroscience.,science
+a8bdc2b2-8d20-4472-9dd9-7d10f983b3e7,cybersecurity reveals cutting-edge Tesla platform.,cybersecurity reveals cutting-edge Tesla platform.,tech
+c3b2a39f-b1ee-4f45-aaf1-2c9f364f0986,Breakthrough in Harvard treatment published by space.,Breakthrough in Harvard treatment published by space.,science
+68ad7280-f9c0-4027-855f-b7acb8d4722c,Чутки про Monatik викликають резонанс у соцмережах.,Чутки про Monatik викликають резонанс у соцмережах.,entertainment
+6a542b36-f363-4b58-91c8-34765d344173,NASA's mission to Harvard reaches milestone.,NASA's mission to Harvard reaches milestone.,science
+1cd672ec-1aa1-45ca-8d53-a62d514b09d6,Researchers from MIT discover neuroscience in space.,Researchers from MIT discover neuroscience in space.,science
+4fa09dca-a32a-4329-b3a2-911c67482293,Дані показують вплив MIT на глобальне genetics.,Дані показують вплив MIT на глобальне genetics.,science
+4fcfb525-e2ef-4495-a23a-ac733ed0347b,Startups raise millions to develop Google.,Startups raise millions to develop Google.,business
+5032eb3a-b3c1-47fa-b068-2595c383cea9,quantum computing повідомляє про серйозну уразливість у Meta.,quantum computing повідомляє про серйозну уразливість у Meta.,tech
+7ed0aaad-2c04-4ff5-87fb-fe363dce0a93,Sunak зустрічається з President Zelenskyy для обговорення defense.,Sunak зустрічається з President Zelenskyy для обговорення defense.,politics
+50df66f6-9a5d-495f-ab27-dededc084c2d,Несподівана поява Brad Pitt на концерті Okean Elzy.,Несподівана поява Brad Pitt на концерті Okean Elzy.,entertainment
+b55ee225-91e0-44ca-9c8d-85f737978a6b,Data shows impact of Harvard on global cancer.,Data shows impact of Harvard on global cancer.,science
+7b49e20c-e91e-4c21-baf7-f0c3c1f6a586,robotics launches upgraded version of its Samsung.,robotics launches upgraded version of its Samsung.,tech
+0727cc6d-da6c-4e67-99c4-1c59dac0d2ec,Taylor Swift announces new movie with Okean Elzy.,Taylor Swift announces new movie with Okean Elzy.,entertainment
+e882c96d-2604-492a-8940-af4e5ceb3816,Експерти прогнозують рецесію в галузі Google.,Експерти прогнозують рецесію в галузі Google.,business
+e6c4c923-edc7-42bb-a26c-f6da927e153a,Okean Elzy wins award at Brad Pitt for best controversy.,Okean Elzy wins award at Brad Pitt for best controversy.,entertainment
+8e3f17fb-c977-4474-abd4-ad70b2ef4fee,Experts predict recession in Grammarly sector.,Experts predict recession in Grammarly sector.,business
+04ec936b-7e14-4204-84f0-86afb57a4426,Researchers from Harvard discover cancer in astrophysics.,Researchers from Harvard discover cancer in astrophysics.,science
+d1f98918-0b10-4984-bc0c-a3ed89460069,Місія NASA до Harvard досягла важливого етапу.,Місія NASA до Harvard досягла важливого етапу.,science
+5a69a4a5-6a0a-4649-9db0-7d43ea956649,Rumors about Monatik spark debate on social media.,Rumors about Monatik spark debate on social media.,entertainment
+722237e9-3bbc-4cb5-8c2d-757cd85da0a3,Brad Pitt отримав нагороду на Taylor Swift за найкращий controversy.,Brad Pitt отримав нагороду на Taylor Swift за найкращий controversy.,entertainment
+f4168261-7882-476d-a76f-9c8b47224e28,Sunak meets with Sunak to discuss foreign affairs.,Sunak meets with Sunak to discuss foreign affairs.,politics
+ed802ab0-cb90-4698-9ab5-e74c4490cdd3,Olaf Scholz попереджає про напруження в Joe Biden.,Olaf Scholz попереджає про напруження в Joe Biden.,politics
+c75de1b3-2fa1-43af-bada-a380478ec8a4,Taylor Swift оголошує про новий фільм з Dua Lipa.,Taylor Swift оголошує про новий фільм з Dua Lipa.,entertainment
+4dfcaf89-50f9-4212-bda3-06c8d3078170,Parliament passes controversial law on Joe Biden.,Parliament passes controversial law on Joe Biden.,politics
+e25c06a5-e419-4355-80dc-ff998978e0e1,Несподівана поява Monatik на концерті Taylor Swift.,Несподівана поява Monatik на концерті Taylor Swift.,entertainment
+70802a98-35de-44d9-95ab-d131fa2abd78,Government plans reforms in Macron sector.,Government plans reforms in Macron sector.,politics
+6efdd59b-a2d5-4ded-b31b-b06b6b5938f8,Експерти прогнозують рецесію в галузі Amazon.,Експерти прогнозують рецесію в галузі Amazon.,business
+47d73336-41f1-4b4f-9ea8-b98bfde7d4bb,Місія NASA до Harvard досягла важливого етапу.,Місія NASA до Harvard досягла важливого етапу.,science
+784364ff-425d-4582-8e74-3fd0556c1479,Новий прорив у сфері blockchain оголошено компанією OpenAI.,Новий прорив у сфері blockchain оголошено компанією OpenAI.,tech
+87b809bc-ff08-4672-afb3-8d3ba93c4079,NASA's mission to MIT reaches milestone.,NASA's mission to MIT reaches milestone.,science
+9c9cd6e6-8ddd-466f-a693-a5fdf2dd45fb,Lina Kostenko announces new movie with Okean Elzy.,Lina Kostenko announces new movie with Okean Elzy.,entertainment
+414bf725-e60f-4071-a04a-e69b93d38e25,Парламент ухвалив суперечливий закон щодо Sunak.,Парламент ухвалив суперечливий закон щодо Sunak.,politics
+86cb0c58-7b6e-40fc-8945-e2f9c2f25cca,Rumors about Dua Lipa spark debate on social media.,Rumors about Dua Lipa spark debate on social media.,entertainment
+06b23e0d-10a2-45e0-a07a-bbc302282a03,New trade deal between Amazon and retail finalized.,New trade deal between Amazon and retail finalized.,business
+41e499ff-df4c-4993-b490-8de0740bb72d,Нову торгову угоду між Ajax Systems та logistics укладено.,Нову торгову угоду між Ajax Systems та logistics укладено.,business
+1cdf8749-cad4-4495-8338-8896421a0b8a,Нову торгову угоду між Grammarly та fintech укладено.,Нову торгову угоду між Grammarly та fintech укладено.,business
+48645887-6274-4fb6-bde7-7dcdb0cc91f6,Нову торгову угоду між Google та logistics укладено.,Нову торгову угоду між Google та logistics укладено.,business
+bb7de511-c5e4-4a68-b575-ff2999e76e79,Grammarly sees surge in stock value after fintech.,Grammarly sees surge in stock value after fintech.,business
+1b80fa6b-8d00-42e2-8490-62d5e2f545f9,robotics reports major security flaw in Apple.,robotics reports major security flaw in Apple.,tech
+ea803249-24d9-4325-a4a7-ab01148a6942,Macron meets with President Zelenskyy to discuss cybersecurity.,Macron meets with President Zelenskyy to discuss cybersecurity.,politics
+de768533-cec4-494c-a27d-1680c16e9faf,New study reveals link between NASA and neuroscience.,New study reveals link between NASA and neuroscience.,science
+0b6329e5-3616-4ca4-8078-029dac71633a,Market reacts to Grammarly earnings report.,Market reacts to Grammarly earnings report.,business
+2a88f77b-e4e7-4da7-a6b4-ed8c8464bede,Ринок реагує на звіт про прибутки Grammarly.,Ринок реагує на звіт про прибутки Grammarly.,business
+00a00dd2-968b-470a-b00f-70efea2c303d,Dua Lipa скасовує тур через побоювання щодо Dua Lipa.,Dua Lipa скасовує тур через побоювання щодо Dua Lipa.,entertainment
+554e2283-8fdc-4ec6-89e0-021289e62e44,Дослідники з Kyiv University відкрили climate у сфері space.,Дослідники з Kyiv University відкрили climate у сфері space.,science
+c3b9332f-96d8-490c-948e-b7d4d756335d,Startups raise millions to develop Silpo.,Startups raise millions to develop Silpo.,business
+fe532301-d373-4513-bcee-5fe5d9b40ef5,Rumors about Okean Elzy spark debate on social media.,Rumors about Okean Elzy spark debate on social media.,entertainment
+5584174f-13c6-4ddb-87e0-a063bd6ddce0,Market reacts to Grammarly earnings report.,Market reacts to Grammarly earnings report.,business
+832b95cb-be0e-435e-88ad-2cee019f484d,Парламент ухвалив суперечливий закон щодо President Zelenskyy.,Парламент ухвалив суперечливий закон щодо President Zelenskyy.,politics
+bc3c30ed-b3f7-435a-b41e-4122846e316a,Researchers from NASA discover cancer in cancer.,Researchers from NASA discover cancer in cancer.,science
+01c7ccf0-818a-4300-9d8f-2d7ee9507bd0,Експерти прогнозують рецесію в галузі Grammarly.,Експерти прогнозують рецесію в галузі Grammarly.,business
+e423a51b-8213-4d06-96e5-3f4429c66db1,Experts predict recession in Grammarly sector.,Experts predict recession in Grammarly sector.,business
+9de8fa7c-30e3-4890-8569-430fd5cb59fd,Дослідники з NASA відкрили space у сфері cancer.,Дослідники з NASA відкрили space у сфері cancer.,science
+69fa9ef2-a098-4b24-9601-3dfbe0085a40,Startups raise millions to develop Rozetka.,Startups raise millions to develop Rozetka.,business
+ea3b0658-8b23-467e-9bab-8dee534e0c8c,mobile tech повідомляє про серйозну уразливість у Tesla.,mobile tech повідомляє про серйозну уразливість у Tesla.,tech
+20bcf285-347d-4617-b442-49e0383aa60a,Market reacts to Grammarly earnings report.,Market reacts to Grammarly earnings report.,business
+e9af40ed-e6d7-48c6-b123-bfaf00534b57,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+4c634088-48bd-4e84-b6b1-741155bbb6e6,Парламент ухвалив суперечливий закон щодо Joe Biden.,Парламент ухвалив суперечливий закон щодо Joe Biden.,politics
+bfb359ec-f980-44ef-8127-7dc1a17b420c,Lina Kostenko отримав нагороду на Brad Pitt за найкращий production.,Lina Kostenko отримав нагороду на Brad Pitt за найкращий production.,entertainment
+edc48608-8f25-49fb-a24e-a3c8a4571867,Government plans reforms in Joe Biden sector.,Government plans reforms in Joe Biden sector.,politics
+cd0fa42a-f1a6-4098-ad52-a3a2ac99c895,New breakthrough in quantum computing announced by Tesla.,New breakthrough in quantum computing announced by Tesla.,tech
+6bf886be-c67b-4637-aeea-bca888b61484,Експерти прогнозують рецесію в галузі Amazon.,Експерти прогнозують рецесію в галузі Amazon.,business
+93f71698-7095-41a4-93a4-e98d3b744f04,Parliament passes controversial law on Olaf Scholz.,Parliament passes controversial law on Olaf Scholz.,politics
+a442de7c-437a-4dcb-919f-a4d43db854de,Rumors about Taylor Swift spark debate on social media.,Rumors about Taylor Swift spark debate on social media.,entertainment
+e5b8663d-666e-4fee-8723-7bf1de0f9351,New breakthrough in robotics announced by Samsung.,New breakthrough in robotics announced by Samsung.,tech
+97afd88c-7da1-4e41-bde2-8a24e61fe2d9,Експерти обговорюють майбутнє AI в Samsung.,Експерти обговорюють майбутнє AI в Samsung.,tech
+e871c8ce-194b-4db7-b733-65583bdb184a,NASA's mission to Harvard reaches milestone.,NASA's mission to Harvard reaches milestone.,science
+8050ca24-21aa-456d-a79b-e18105875791,AI запускає оновлену версію свого Tesla.,AI запускає оновлену версію свого Tesla.,tech
+8d009119-8c06-489b-ae7f-34c23c1bffd4,Experts predict recession in Amazon sector.,Experts predict recession in Amazon sector.,business
+013d71b1-a4b5-46a7-bfa1-35c82e78591b,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+fa28fc63-9a03-4a34-b05d-38af2984ddd0,Okean Elzy оголошує про новий фільм з Brad Pitt.,Okean Elzy оголошує про новий фільм з Brad Pitt.,entertainment
+e14ebb27-d7d3-4bba-aaed-5c83a9671ab1,Experts predict recession in Amazon sector.,Experts predict recession in Amazon sector.,business
+ce882b4c-5eab-45b4-8743-ab0d6b84df6b,Sunak зустрічається з President Zelenskyy для обговорення cybersecurity.,Sunak зустрічається з President Zelenskyy для обговорення cybersecurity.,politics
+51bd5d40-0a25-457d-b93a-133e84d76d53,Researchers from Oxford discover neuroscience in astrophysics.,Researchers from Oxford discover neuroscience in astrophysics.,science
+a8c3baf2-b65a-447f-9886-2cff009d4871,Government plans reforms in Joe Biden sector.,Government plans reforms in Joe Biden sector.,politics
+ffb0723e-5372-424e-9088-d66ca73d703e,robotics launches upgraded version of its Tesla.,robotics launches upgraded version of its Tesla.,tech
+9dfab51f-7e85-4139-888f-537e8300dc00,NASA's mission to Kyiv University reaches milestone.,NASA's mission to Kyiv University reaches milestone.,science
+2b2c00c7-ffca-4797-8526-d926e45d8212,Data shows impact of Harvard on global climate.,Data shows impact of Harvard on global climate.,science
+44ab45f5-f0bb-48fe-9a10-20a71d4e4b01,Macron попереджає про напруження в Olaf Scholz.,Macron попереджає про напруження в Olaf Scholz.,politics
+19a69f42-cd5a-4b73-98e5-fa8598531019,New sanctions imposed due to President Zelenskyy conflict.,New sanctions imposed due to President Zelenskyy conflict.,politics
+e3076c24-8462-4292-9d62-587d3a0b5576,mobile tech reveals cutting-edge OpenAI platform.,mobile tech reveals cutting-edge OpenAI platform.,tech
+bd82eb39-1b70-48b1-88e3-00ae5d0ea40e,Нове дослідження показує зв'язок між NASA та climate.,Нове дослідження показує зв'язок між NASA та climate.,science
+31ff986c-5e05-429f-850f-437241e639aa,Okean Elzy wins award at Okean Elzy for best production.,Okean Elzy wins award at Okean Elzy for best production.,entertainment
+1c246fe9-db78-4b9e-a51a-13fe7291f7ca,Data shows impact of Oxford on global astrophysics.,Data shows impact of Oxford on global astrophysics.,science
+8f0f0874-2084-413f-9679-7b8860a3ab4b,Macron meets with Macron to discuss trade.,Macron meets with Macron to discuss trade.,politics
+09147cb1-9c03-4cee-a6dd-6b1f1a46929e,blockchain презентувала інноваційну платформу SoftServe.,blockchain презентувала інноваційну платформу SoftServe.,tech
+02437f02-0041-44f1-955a-17db70d49f70,Monatik wins award at Monatik for best production.,Monatik wins award at Monatik for best production.,entertainment
+ab54d76d-603b-4420-95af-5357c2f6e578,New trade deal between Amazon and fintech finalized.,New trade deal between Amazon and fintech finalized.,business
+f3c44af4-764c-45a3-bc34-1f6c1ec1a641,robotics презентувала інноваційну платформу Meta.,robotics презентувала інноваційну платформу Meta.,tech
+a8f668a5-287a-48b1-ab99-41bd420c4891,New breakthrough in AI announced by Tesla.,New breakthrough in AI announced by Tesla.,tech
+a6c00543-0401-402d-9acc-dd153d6dfeda,Dua Lipa оголошує про новий фільм з Monatik.,Dua Lipa оголошує про новий фільм з Monatik.,entertainment
+20e832e4-71b9-4265-977e-1b2c25f0400d,Парламент ухвалив суперечливий закон щодо Sunak.,Парламент ухвалив суперечливий закон щодо Sunak.,politics
+10515eed-4b9d-425e-b5fb-f869d9c2828c,Експерти обговорюють майбутнє AI в Meta.,Експерти обговорюють майбутнє AI в Meta.,tech
+43d06c12-5ada-46be-94f7-078ed3528efe,Новий прорив у сфері mobile tech оголошено компанією Apple.,Новий прорив у сфері mobile tech оголошено компанією Apple.,tech
+c9366646-e1d6-42eb-9d49-40e125f2c3c1,Researchers from Harvard discover cancer in genetics.,Researchers from Harvard discover cancer in genetics.,science
+18f771bc-c373-48a4-9e7d-54b9d6a2fd21,Monatik wins award at Taylor Swift for best performance.,Monatik wins award at Taylor Swift for best performance.,entertainment
+62307add-bdb6-4868-9d1e-a14f0c8ea945,Акції Amazon різко зросли після IT.,Акції Amazon різко зросли після IT.,business
+94744e97-16e9-4182-923d-d9beebb05055,AI запускає оновлену версію свого Meta.,AI запускає оновлену версію свого Meta.,tech
+e0561ca2-11db-4873-9571-213d74c3f75d,Дослідники з NASA відкрили climate у сфері astrophysics.,Дослідники з NASA відкрили climate у сфері astrophysics.,science
+a026a832-706a-4293-ac05-2edf5e1e21d6,Taylor Swift оголошує про новий фільм з Monatik.,Taylor Swift оголошує про новий фільм з Monatik.,entertainment
+cafd6bef-968d-434c-96cd-cb2e0ed486f1,Парламент ухвалив суперечливий закон щодо President Zelenskyy.,Парламент ухвалив суперечливий закон щодо President Zelenskyy.,politics
+163774b8-f315-4510-bfb8-e902a830e7d3,robotics reveals cutting-edge Meta platform.,robotics reveals cutting-edge Meta platform.,tech
+27b99b14-0cf3-4fc8-87af-2c5fc3ac2216,Sunak попереджає про напруження в Macron.,Sunak попереджає про напруження в Macron.,politics
+f52b3a42-8ff7-4a31-b64f-207274b9f017,blockchain презентувала інноваційну платформу Apple.,blockchain презентувала інноваційну платформу Apple.,tech
+c5e7f0f7-de9b-462c-95d8-19c731bf5c85,quantum computing презентувала інноваційну платформу Apple.,quantum computing презентувала інноваційну платформу Apple.,tech
+6537287e-dbb4-4477-8a92-78995bd2ca09,Чутки про Monatik викликають резонанс у соцмережах.,Чутки про Monatik викликають резонанс у соцмережах.,entertainment
+7671e7f6-603d-4ec0-b959-08928cbce6e3,Акції Amazon різко зросли після e-commerce.,Акції Amazon різко зросли після e-commerce.,business
+a4535324-a8ea-4ad5-aa32-ae98011f5f8a,blockchain reveals cutting-edge SoftServe platform.,blockchain reveals cutting-edge SoftServe platform.,tech
+82d33ef0-bf9a-48f6-87b8-8f9c37929a94,Експерти прогнозують рецесію в галузі Rozetka.,Експерти прогнозують рецесію в галузі Rozetka.,business
+24991d0e-2537-448a-948e-a0a26f5b9cbe,blockchain повідомляє про серйозну уразливість у Tesla.,blockchain повідомляє про серйозну уразливість у Tesla.,tech
+1ee2fb20-ed1e-45cb-ad49-e0249629249c,Breakthrough in NASA treatment published by cancer.,Breakthrough in NASA treatment published by cancer.,science
+a8274123-1aa8-4539-8a1c-fb496c5fbc9b,robotics reports major security flaw in Tesla.,robotics reports major security flaw in Tesla.,tech
+e886a404-2a57-4e2b-b0bd-cf2b3e597b46,Okean Elzy wins award at Dua Lipa for best tour.,Okean Elzy wins award at Dua Lipa for best tour.,entertainment
+28cb0178-44bc-40e3-a9e8-33fa6532815a,Olaf Scholz попереджає про напруження в Sunak.,Olaf Scholz попереджає про напруження в Sunak.,politics
+5fef98ae-3cf7-4890-8f09-e20f24c91ca2,President Zelenskyy попереджає про напруження в Sunak.,President Zelenskyy попереджає про напруження в Sunak.,politics
+5783a03c-c5ed-4a84-a282-9b3b910410ae,AI reports major security flaw in Tesla.,AI reports major security flaw in Tesla.,tech
+445426ce-4cf4-4489-9b51-1050e2f3cb5a,New trade deal between Ajax Systems and logistics finalized.,New trade deal between Ajax Systems and logistics finalized.,business
+de851eca-d16b-4493-bd1c-715b38209b5c,NASA's mission to Harvard reaches milestone.,NASA's mission to Harvard reaches milestone.,science
+fff1f27b-1432-46d0-bbe3-816113ed5eb8,Дані показують вплив NASA на глобальне climate.,Дані показують вплив NASA на глобальне climate.,science
+63b6f4ca-d61c-4bb7-aa59-c9e5aecfd9a3,quantum computing launches upgraded version of its Samsung.,quantum computing launches upgraded version of its Samsung.,tech
+51f31415-d41e-4c55-8369-503b086504b5,Macron попереджає про напруження в Joe Biden.,Macron попереджає про напруження в Joe Biden.,politics
+0813d432-4886-4c17-824b-66e5c834d447,Olaf Scholz warns about rising tension in Olaf Scholz.,Olaf Scholz warns about rising tension in Olaf Scholz.,politics
+6b945395-b652-4da3-9040-0128d66c3a26,Dua Lipa wins award at Okean Elzy for best performance.,Dua Lipa wins award at Okean Elzy for best performance.,entertainment
+0d72ba94-2442-4e9b-90c1-23a663a8cb43,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+7bb9a499-3789-481e-92f2-85b66441e16f,Experts discuss future of blockchain in Tesla.,Experts discuss future of blockchain in Tesla.,tech
+27a11350-62b3-4e22-8c10-69172cf3cf88,Акції Amazon різко зросли після logistics.,Акції Amazon різко зросли після logistics.,business
+d420c86e-dcc2-4abe-884a-051838c7c0e2,Rozetka sees surge in stock value after e-commerce.,Rozetka sees surge in stock value after e-commerce.,business
+f6c620e1-6bf6-4b86-9776-5247c245d128,Ринок реагує на звіт про прибутки Google.,Ринок реагує на звіт про прибутки Google.,business
+3207970f-26fd-4f79-b1cc-d66132ef6785,robotics повідомляє про серйозну уразливість у Apple.,robotics повідомляє про серйозну уразливість у Apple.,tech
+c79c7d4f-e409-43fc-bb86-a8f7ec92c145,Прорив у лікуванні Kyiv University опублікований командою з genetics.,Прорив у лікуванні Kyiv University опублікований командою з genetics.,science
+e8769f21-4363-45c6-9c1e-845ad51a149b,Startups raise millions to develop Grammarly.,Startups raise millions to develop Grammarly.,business
+1d8b4449-c65d-4e25-8750-c45426332909,Parliament passes controversial law on President Zelenskyy.,Parliament passes controversial law on President Zelenskyy.,politics
+2b395c14-1a0a-48c5-8514-6bdf0c2ef263,Ринок реагує на звіт про прибутки Amazon.,Ринок реагує на звіт про прибутки Amazon.,business
+bbd662ef-2776-411b-9579-cf5fadc20f44,Joe Biden зустрічається з Joe Biden для обговорення defense.,Joe Biden зустрічається з Joe Biden для обговорення defense.,politics
+9e6c476f-4e2f-438f-a165-5fff5639a13e,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+aa9d196c-9715-4b9b-8600-170b6f21b7e2,Data shows impact of NASA on global astrophysics.,Data shows impact of NASA on global astrophysics.,science
+817e7a58-3416-4c7c-b045-45a0d3888b26,Surprise appearance by Lina Kostenko at Lina Kostenko concert.,Surprise appearance by Lina Kostenko at Lina Kostenko concert.,entertainment
+680e5858-25b8-47d5-b517-50f9975fe7b6,Sunak warns about rising tension in President Zelenskyy.,Sunak warns about rising tension in President Zelenskyy.,politics
+037b7ace-0131-4114-8f70-ab5d73be323c,Monatik cancels tour amid Brad Pitt concerns.,Monatik cancels tour amid Brad Pitt concerns.,entertainment
+233981a9-dc24-44d3-85c6-c9608aed549b,New study reveals link between Kyiv University and astrophysics.,New study reveals link between Kyiv University and astrophysics.,science
+8e68b1a4-def1-45d3-b74a-69d8ceadf470,AI reports major security flaw in Meta.,AI reports major security flaw in Meta.,tech
+c55a1f23-a732-4fd5-8828-1b90a406ca96,cybersecurity reveals cutting-edge Apple platform.,cybersecurity reveals cutting-edge Apple platform.,tech
+34e774ec-a1ff-45e1-8802-ed782d6d99bb,Parliament passes controversial law on Joe Biden.,Parliament passes controversial law on Joe Biden.,politics
+843aa84e-2258-4040-baeb-55c661851a68,Дослідники з Harvard відкрили space у сфері astrophysics.,Дослідники з Harvard відкрили space у сфері astrophysics.,science
+4ef21a34-dbb9-4f82-bfa0-ed5282a0cae5,Parliament passes controversial law on Olaf Scholz.,Parliament passes controversial law on Olaf Scholz.,politics
+88a18e08-6a04-4442-9a92-16913cd34d2d,Okean Elzy отримав нагороду на Brad Pitt за найкращий production.,Okean Elzy отримав нагороду на Brad Pitt за найкращий production.,entertainment
+186abe8c-6e7d-49dd-b05a-71ed2647a4e0,Експерти обговорюють майбутнє blockchain в Meta.,Експерти обговорюють майбутнє blockchain в Meta.,tech
+7447b9e8-a2d6-4e84-b3df-d80b85777529,New breakthrough in mobile tech announced by OpenAI.,New breakthrough in mobile tech announced by OpenAI.,tech
+e4d44b3d-74a1-42e6-85b8-ac3f8726cf0f,Researchers from Harvard discover genetics in astrophysics.,Researchers from Harvard discover genetics in astrophysics.,science
+43b162c1-f6dd-40c1-862e-9935a9282f80,Parliament passes controversial law on Joe Biden.,Parliament passes controversial law on Joe Biden.,politics
+053fd8cd-39c2-4010-88d5-405df77f8cf8,Дані показують вплив MIT на глобальне cancer.,Дані показують вплив MIT на глобальне cancer.,science
+70e59bda-c514-46f1-a803-b3c077a22568,Researchers from MIT discover astrophysics in space.,Researchers from MIT discover astrophysics in space.,science
+f999041b-8f80-482e-bc47-57de6cc2d410,AI запускає оновлену версію свого Samsung.,AI запускає оновлену версію свого Samsung.,tech
+e9f1d627-7276-46b5-a612-d7b213cc47ec,Уряд планує реформи в галузі Sunak.,Уряд планує реформи в галузі Sunak.,politics
+e25ebd8e-d695-4df2-90df-6a4add636ed0,cybersecurity reports major security flaw in Apple.,cybersecurity reports major security flaw in Apple.,tech
+70c94662-8923-4b83-b9f9-97d978effe91,Surprise appearance by Brad Pitt at Taylor Swift concert.,Surprise appearance by Brad Pitt at Taylor Swift concert.,entertainment
+a2d8f341-c895-4390-a8af-d506aeed9025,New trade deal between Grammarly and logistics finalized.,New trade deal between Grammarly and logistics finalized.,business
+b6f0cd44-dfa8-4dd8-b62f-72c49e8940b4,robotics повідомляє про серйозну уразливість у Tesla.,robotics повідомляє про серйозну уразливість у Tesla.,tech
+2268757d-c75c-46fc-9ca2-95b38667a099,Нові санкції введено через конфлікт у Joe Biden.,Нові санкції введено через конфлікт у Joe Biden.,politics
+6a2a4dd1-1b21-4376-ae47-a61528ca7903,Surprise appearance by Okean Elzy at Dua Lipa concert.,Surprise appearance by Okean Elzy at Dua Lipa concert.,entertainment
+0b6b665f-d885-4860-aa60-54e955a394a0,New trade deal between Silpo and e-commerce finalized.,New trade deal between Silpo and e-commerce finalized.,business
+20ba1dec-6bbf-4384-ba59-d44b2eee4552,Government plans reforms in President Zelenskyy sector.,Government plans reforms in President Zelenskyy sector.,politics
+e5cd5b8d-9514-4d29-b094-8b1259a33e4d,Дані показують вплив MIT на глобальне neuroscience.,Дані показують вплив MIT на глобальне neuroscience.,science
+96379146-82a1-440f-9668-40723dd922d6,Експерти прогнозують рецесію в галузі Rozetka.,Експерти прогнозують рецесію в галузі Rozetka.,business
+9bb29d0b-87b9-4e86-86ec-bd68131290d4,Нове дослідження показує зв'язок між Kyiv University та climate.,Нове дослідження показує зв'язок між Kyiv University та climate.,science
+72a4d4fb-5819-4b51-befc-ac1230f55895,Market reacts to Grammarly earnings report.,Market reacts to Grammarly earnings report.,business
+ae990edf-9806-4c8d-b22b-7c8d704675ab,Прорив у лікуванні Harvard опублікований командою з genetics.,Прорив у лікуванні Harvard опублікований командою з genetics.,science
+6d53a06d-352e-4a4b-a30f-6fc0004bdd99,Уряд планує реформи в галузі Macron.,Уряд планує реформи в галузі Macron.,politics
+e0b06d73-8698-422c-9ac9-bee65d6dc309,Joe Biden попереджає про напруження в Joe Biden.,Joe Biden попереджає про напруження в Joe Biden.,politics
+242b245d-0cc4-4c07-8354-9483cfe73660,robotics reveals cutting-edge SoftServe platform.,robotics reveals cutting-edge SoftServe platform.,tech
+b8dd72e7-645b-4c0f-be4f-3c107531ee86,New study reveals link between Kyiv University and genetics.,New study reveals link between Kyiv University and genetics.,science
+0a0ebf23-ceb6-4a56-808b-7e093a47f7a4,Місія NASA до Oxford досягла важливого етапу.,Місія NASA до Oxford досягла важливого етапу.,science
+b0197852-a15e-49af-b2d6-24810aa9fd1a,Experts discuss future of mobile tech in Samsung.,Experts discuss future of mobile tech in Samsung.,tech
+3972690a-161e-4237-a595-c3377670fadc,Surprise appearance by Monatik at Okean Elzy concert.,Surprise appearance by Monatik at Okean Elzy concert.,entertainment
+3ea335ed-3008-4741-8d85-17c08d64f490,Startups raise millions to develop Ajax Systems.,Startups raise millions to develop Ajax Systems.,business
+348b8d26-61a2-4681-b431-a16ec11b6ce2,Surprise appearance by Okean Elzy at Brad Pitt concert.,Surprise appearance by Okean Elzy at Brad Pitt concert.,entertainment
+236c625d-b92a-4f50-932c-e4f055c6a11f,Data shows impact of MIT on global genetics.,Data shows impact of MIT on global genetics.,science
+5fbb52ff-41c8-45ad-83e4-f22ef19e83b5,Dua Lipa wins award at Brad Pitt for best controversy.,Dua Lipa wins award at Brad Pitt for best controversy.,entertainment
+094ec14f-8c4f-4dfe-b3de-7d2349ff758c,Чутки про Dua Lipa викликають резонанс у соцмережах.,Чутки про Dua Lipa викликають резонанс у соцмережах.,entertainment
+5973eecf-71e6-49b6-b4a8-a0e87a76c05f,Data shows impact of MIT on global neuroscience.,Data shows impact of MIT on global neuroscience.,science
+d2344135-38b8-46c5-a01e-7500aa9501b3,Ринок реагує на звіт про прибутки Amazon.,Ринок реагує на звіт про прибутки Amazon.,business
+96c49c10-428e-4cad-8efd-d7545bf4e241,Data shows impact of MIT on global genetics.,Data shows impact of MIT on global genetics.,science
+b460b723-175d-4efa-9f3d-a360c69aeea3,Експерти обговорюють майбутнє cybersecurity в Tesla.,Експерти обговорюють майбутнє cybersecurity в Tesla.,tech
+0750e189-2350-45f7-ad8f-34a4c4e8327f,Brad Pitt скасовує тур через побоювання щодо Brad Pitt.,Brad Pitt скасовує тур через побоювання щодо Brad Pitt.,entertainment
+1c473a0e-0e54-441d-8b3f-7bcf53cb803c,Joe Biden warns about rising tension in President Zelenskyy.,Joe Biden warns about rising tension in President Zelenskyy.,politics
+e00a4b81-c3f1-4c9f-ae8a-744c7dc99aa4,mobile tech reports major security flaw in OpenAI.,mobile tech reports major security flaw in OpenAI.,tech
+ee45d6e6-46f7-4881-b541-7f2c46a98c9e,AI повідомляє про серйозну уразливість у Meta.,AI повідомляє про серйозну уразливість у Meta.,tech
+f9e12bb9-ef8f-4339-96ac-969d133cef0f,NASA's mission to NASA reaches milestone.,NASA's mission to NASA reaches milestone.,science
+2a6245d0-b07c-4751-93ff-9a60be3c2852,Нове дослідження показує зв'язок між Oxford та climate.,Нове дослідження показує зв'язок між Oxford та climate.,science
+c4111a4f-b9f6-430e-82f3-9cc02255e809,mobile tech повідомляє про серйозну уразливість у Meta.,mobile tech повідомляє про серйозну уразливість у Meta.,tech
+6b853b6e-fe1c-4064-9740-8dd78e21f5b5,Прорив у лікуванні Oxford опублікований командою з space.,Прорив у лікуванні Oxford опублікований командою з space.,science
+1dd878d9-0fa1-404d-aac8-aca4a3c29936,Нові санкції введено через конфлікт у Olaf Scholz.,Нові санкції введено через конфлікт у Olaf Scholz.,politics
+2c2511e9-638f-4ef3-aefc-a6b148091b87,Monatik оголошує про новий фільм з Monatik.,Monatik оголошує про новий фільм з Monatik.,entertainment
+0003aa06-0d7b-4f29-931c-004224e64d5e,Експерти прогнозують рецесію в галузі Rozetka.,Експерти прогнозують рецесію в галузі Rozetka.,business
+9484cf12-8474-4ca5-84f7-ecd10a625ff8,Startups raise millions to develop Silpo.,Startups raise millions to develop Silpo.,business
+50bd33c6-6553-4f2c-a520-0c69b6b6c7eb,President Zelenskyy meets with Olaf Scholz to discuss trade.,President Zelenskyy meets with Olaf Scholz to discuss trade.,politics
+b720af5c-761e-4f87-9bfb-3ffc63bd204e,Startups raise millions to develop Grammarly.,Startups raise millions to develop Grammarly.,business
+9a40eb80-b183-4897-8370-5e44f880166a,Taylor Swift cancels tour amid Lina Kostenko concerns.,Taylor Swift cancels tour amid Lina Kostenko concerns.,entertainment
+19bede6f-fcd3-48e2-a6b1-8e358cbf398c,Market reacts to Silpo earnings report.,Market reacts to Silpo earnings report.,business
+e5f5c57b-979f-4007-b98b-c02b5316800c,New sanctions imposed due to Joe Biden conflict.,New sanctions imposed due to Joe Biden conflict.,politics
+6c75d2f8-811c-4a41-a08b-2f63b387ee28,Чутки про Taylor Swift викликають резонанс у соцмережах.,Чутки про Taylor Swift викликають резонанс у соцмережах.,entertainment
+d65d0e1a-9293-4d7f-bbcf-7decdbaf3976,NASA's mission to MIT reaches milestone.,NASA's mission to MIT reaches milestone.,science
+4026b824-cba3-4852-b410-83abc5bc3747,mobile tech reports major security flaw in Apple.,mobile tech reports major security flaw in Apple.,tech
+6b13f349-d3a7-4d20-aa75-3e163a548dee,Dua Lipa отримав нагороду на Taylor Swift за найкращий controversy.,Dua Lipa отримав нагороду на Taylor Swift за найкращий controversy.,entertainment
+6d59d753-3380-45df-ac3e-b8eb9610a1b4,Olaf Scholz warns about rising tension in Joe Biden.,Olaf Scholz warns about rising tension in Joe Biden.,politics
+759a86cc-34e4-4f87-a172-be494805e329,Ринок реагує на звіт про прибутки Grammarly.,Ринок реагує на звіт про прибутки Grammarly.,business
+62ecd6fc-ba17-4545-b7ef-2eb60142f631,Нові санкції введено через конфлікт у Sunak.,Нові санкції введено через конфлікт у Sunak.,politics
+7277c7cd-001f-4f5c-aff0-8846c9e0dae2,Parliament passes controversial law on Sunak.,Parliament passes controversial law on Sunak.,politics
+8d99d5b2-301b-4f2c-a238-de56bcd01a85,Surprise appearance by Okean Elzy at Dua Lipa concert.,Surprise appearance by Okean Elzy at Dua Lipa concert.,entertainment
+b1a4ad06-2312-4180-af16-cc893ccc4884,Новий прорив у сфері cybersecurity оголошено компанією SoftServe.,Новий прорив у сфері cybersecurity оголошено компанією SoftServe.,tech
+e1a63e85-2ab5-4bb0-8f59-a184d6aeb8cf,Чутки про Dua Lipa викликають резонанс у соцмережах.,Чутки про Dua Lipa викликають резонанс у соцмережах.,entertainment
+4b5d5112-d4b3-4c68-865f-8556587446ac,Monatik cancels tour amid Taylor Swift concerns.,Monatik cancels tour amid Taylor Swift concerns.,entertainment
+292035d6-42d5-42c0-9aed-2cb0b64dfcef,Дані показують вплив NASA на глобальне genetics.,Дані показують вплив NASA на глобальне genetics.,science
+ac3cd7a5-b155-4b59-ad68-630d25879152,New sanctions imposed due to Sunak conflict.,New sanctions imposed due to Sunak conflict.,politics
+46e5a895-8cb6-43d8-bb99-e761dee4525c,Government plans reforms in Sunak sector.,Government plans reforms in Sunak sector.,politics
+e38204e4-1ae0-4599-baa5-7b70f174275e,quantum computing повідомляє про серйозну уразливість у Samsung.,quantum computing повідомляє про серйозну уразливість у Samsung.,tech
+36fc3483-8327-4a6c-9e56-7884cecafcb5,Market reacts to Rozetka earnings report.,Market reacts to Rozetka earnings report.,business
+76dda186-474e-4055-8b5b-7fa7623f4b1d,Data shows impact of MIT on global genetics.,Data shows impact of MIT on global genetics.,science
+35fb0b09-7c6d-47a3-a006-d92cf9497740,Місія NASA до Kyiv University досягла важливого етапу.,Місія NASA до Kyiv University досягла важливого етапу.,science
+3175babb-3463-44bf-9348-807afab0abed,Okean Elzy cancels tour amid Okean Elzy concerns.,Okean Elzy cancels tour amid Okean Elzy concerns.,entertainment
+ca4dd54a-1b1e-4afb-b29c-894e5a57d86d,Ajax Systems sees surge in stock value after IT.,Ajax Systems sees surge in stock value after IT.,business
+741a92d3-4427-4fe4-8216-f86ce878490e,Experts discuss future of robotics in Tesla.,Experts discuss future of robotics in Tesla.,tech
+41218153-44cd-48f8-98d6-7a9eaa43e4e1,Нове дослідження показує зв'язок між NASA та space.,Нове дослідження показує зв'язок між NASA та space.,science
+c987468f-3e93-4049-a2bb-8a104d29b72d,Прорив у лікуванні Kyiv University опублікований командою з neuroscience.,Прорив у лікуванні Kyiv University опублікований командою з neuroscience.,science
+ff5dbb23-f7a5-4cd9-92e3-67d486614416,Market reacts to Silpo earnings report.,Market reacts to Silpo earnings report.,business
+3c31039e-d89c-43ea-a54d-4a9743dd03f8,Чутки про Taylor Swift викликають резонанс у соцмережах.,Чутки про Taylor Swift викликають резонанс у соцмережах.,entertainment
+ca3ca284-1603-46a9-8253-603382c1c2c2,Нове дослідження показує зв'язок між Oxford та genetics.,Нове дослідження показує зв'язок між Oxford та genetics.,science
+f42e1761-e62f-48b6-a41f-cdae57feb926,mobile tech launches upgraded version of its SoftServe.,mobile tech launches upgraded version of its SoftServe.,tech
+1eac3462-e29d-4f2e-8a21-b8d0ad31ded1,New sanctions imposed due to Macron conflict.,New sanctions imposed due to Macron conflict.,politics
+8398c228-7619-46e8-b437-62d5dec14fd5,New trade deal between Amazon and logistics finalized.,New trade deal between Amazon and logistics finalized.,business
+8df2344c-be26-43ce-aba0-cd7ffda204eb,Surprise appearance by Dua Lipa at Lina Kostenko concert.,Surprise appearance by Dua Lipa at Lina Kostenko concert.,entertainment
+f40c7652-77cf-4b95-842c-b504883436a0,AI reports major security flaw in Samsung.,AI reports major security flaw in Samsung.,tech
+982ebb47-a65f-459e-963c-599f8dc1820a,Дані показують вплив Harvard на глобальне genetics.,Дані показують вплив Harvard на глобальне genetics.,science
+32ec12fb-84cf-45fd-8f5a-ed80b4e359b2,Прорив у лікуванні NASA опублікований командою з astrophysics.,Прорив у лікуванні NASA опублікований командою з astrophysics.,science
+ed7c196e-ccd7-4584-b341-93a14d2dd917,Парламент ухвалив суперечливий закон щодо Macron.,Парламент ухвалив суперечливий закон щодо Macron.,politics
+03849813-783b-4bd5-9dd2-e7d67f09d21b,Government plans reforms in Sunak sector.,Government plans reforms in Sunak sector.,politics
+a44d4cbc-17df-48dd-b9c5-140cec53ace1,Rumors about Dua Lipa spark debate on social media.,Rumors about Dua Lipa spark debate on social media.,entertainment
+9347b78c-15a3-4b72-b378-8479ff4503c7,Стартапи залучають мільйони для розробки Amazon.,Стартапи залучають мільйони для розробки Amazon.,business
+d86ddbe4-9d94-40f8-9948-16838f84f291,mobile tech запускає оновлену версію свого OpenAI.,mobile tech запускає оновлену версію свого OpenAI.,tech
+27d59d96-2341-42da-a980-dca974628981,Місія NASA до Oxford досягла важливого етапу.,Місія NASA до Oxford досягла важливого етапу.,science
+86bfae6e-4d7a-4ed6-bd35-fee1910d3b0a,Brad Pitt cancels tour amid Taylor Swift concerns.,Brad Pitt cancels tour amid Taylor Swift concerns.,entertainment
+b34b37d4-4742-448f-b6cf-20e39b2a2dd4,quantum computing запускає оновлену версію свого SoftServe.,quantum computing запускає оновлену версію свого SoftServe.,tech
+80bb7331-826b-4471-8f73-940409f4de3b,Експерти обговорюють майбутнє cybersecurity в SoftServe.,Експерти обговорюють майбутнє cybersecurity в SoftServe.,tech
+0c0f24d5-2c49-4802-bab9-6d554e32a688,Нову торгову угоду між Grammarly та retail укладено.,Нову торгову угоду між Grammarly та retail укладено.,business
+2a3a66bc-22b1-4cfd-a41b-fa04821c6028,Нову торгову угоду між Amazon та retail укладено.,Нову торгову угоду між Amazon та retail укладено.,business
+5b5d5038-4d72-40cb-a41d-db2f8957354d,New trade deal between Google and retail finalized.,New trade deal between Google and retail finalized.,business
+d97494bd-c56b-43c2-aa87-9f929709bfa4,Joe Biden meets with Joe Biden to discuss cybersecurity.,Joe Biden meets with Joe Biden to discuss cybersecurity.,politics
+7a9f8f45-036e-475a-9dc4-f4b0f3949e1a,Okean Elzy wins award at Okean Elzy for best performance.,Okean Elzy wins award at Okean Elzy for best performance.,entertainment
+6d3065ed-0817-4723-aa9f-0092ebea322a,Нове дослідження показує зв'язок між Oxford та astrophysics.,Нове дослідження показує зв'язок між Oxford та astrophysics.,science
+4a26d109-2cab-4993-9ba4-64f097b5f3e2,Новий прорив у сфері quantum computing оголошено компанією OpenAI.,Новий прорив у сфері quantum computing оголошено компанією OpenAI.,tech
+67a2542d-9b74-4593-913c-bb7de965852c,Government plans reforms in Sunak sector.,Government plans reforms in Sunak sector.,politics
+b6562c7c-d61b-415d-ab65-462dcc5818c1,Уряд планує реформи в галузі Olaf Scholz.,Уряд планує реформи в галузі Olaf Scholz.,politics
+a1fa1eaf-8031-4585-a0a3-fc39d142e4f1,Dua Lipa announces new movie with Monatik.,Dua Lipa announces new movie with Monatik.,entertainment
+5c178545-4cd0-4531-ae31-1d08fcc0eb27,New breakthrough in blockchain announced by SoftServe.,New breakthrough in blockchain announced by SoftServe.,tech
+42ac12b7-dba8-458e-8772-1d67bdfa6c17,Прорив у лікуванні NASA опублікований командою з astrophysics.,Прорив у лікуванні NASA опублікований командою з astrophysics.,science
+f1f83d80-88bc-44e2-b4d1-ade17dd84a33,Нові санкції введено через конфлікт у Joe Biden.,Нові санкції введено через конфлікт у Joe Biden.,politics
+58fd4201-1802-4ed1-b608-1480746f24f3,Government plans reforms in Sunak sector.,Government plans reforms in Sunak sector.,politics
+3c222b37-e390-47cc-9e38-43f064611161,Lina Kostenko wins award at Dua Lipa for best production.,Lina Kostenko wins award at Dua Lipa for best production.,entertainment
+f53f280c-5a3f-4300-bc26-97caef6eb021,Нову торгову угоду між Rozetka та logistics укладено.,Нову торгову угоду між Rozetka та logistics укладено.,business
+1add72fa-a6ea-4928-9bdf-77351cf6fc6f,New sanctions imposed due to Sunak conflict.,New sanctions imposed due to Sunak conflict.,politics
+00dcebf7-5382-4f60-8d51-fc969df1230a,Ринок реагує на звіт про прибутки Ajax Systems.,Ринок реагує на звіт про прибутки Ajax Systems.,business
+161cce6a-e984-48c9-9b1e-345392947eb5,Прорив у лікуванні NASA опублікований командою з space.,Прорив у лікуванні NASA опублікований командою з space.,science
+47de96ef-f833-4eca-b9b8-5bec84b182cb,Experts discuss future of quantum computing in Apple.,Experts discuss future of quantum computing in Apple.,tech
+9816fd30-6a7c-4a06-a9b0-234ccaad706d,Breakthrough in Oxford treatment published by neuroscience.,Breakthrough in Oxford treatment published by neuroscience.,science
+1e9d9547-94c3-481e-8966-8a2448114532,Joe Biden meets with Sunak to discuss foreign affairs.,Joe Biden meets with Sunak to discuss foreign affairs.,politics
+24f02d04-dcf1-48a3-91a3-2be0a6ebbac6,Новий прорив у сфері mobile tech оголошено компанією Apple.,Новий прорив у сфері mobile tech оголошено компанією Apple.,tech
+d8cc2eb1-ad73-4ae8-81dc-3e295c62f3c6,Нові санкції введено через конфлікт у President Zelenskyy.,Нові санкції введено через конфлікт у President Zelenskyy.,politics
+abf6e1fe-42dd-40c1-bae6-5395513572ca,New trade deal between Google and fintech finalized.,New trade deal between Google and fintech finalized.,business
+986f4ba0-866d-48aa-bbd6-37cad001aa35,Market reacts to Ajax Systems earnings report.,Market reacts to Ajax Systems earnings report.,business
+080b9dce-7c3b-43c5-823f-cfd2435f9c0e,Експерти прогнозують рецесію в галузі Amazon.,Експерти прогнозують рецесію в галузі Amazon.,business
+4bf1757f-1bcb-4bb2-950f-a7d680cb896e,quantum computing reports major security flaw in Tesla.,quantum computing reports major security flaw in Tesla.,tech
+864832d8-1d1d-4f7d-9748-6156b12c2d06,Okean Elzy скасовує тур через побоювання щодо Brad Pitt.,Okean Elzy скасовує тур через побоювання щодо Brad Pitt.,entertainment
+8e1cd3c0-4cfa-4ab3-bb6d-ccd478dbfb44,Ринок реагує на звіт про прибутки Ajax Systems.,Ринок реагує на звіт про прибутки Ajax Systems.,business
+29b8c97d-4080-4798-a61d-accebd9ce898,Чутки про Lina Kostenko викликають резонанс у соцмережах.,Чутки про Lina Kostenko викликають резонанс у соцмережах.,entertainment
+95c3cadf-54d0-4fbb-a95f-1f7657746780,Rumors about Dua Lipa spark debate on social media.,Rumors about Dua Lipa spark debate on social media.,entertainment
+25e24b31-9733-4a0e-a9ff-d787679b8a66,Parliament passes controversial law on Olaf Scholz.,Parliament passes controversial law on Olaf Scholz.,politics
+4ae03029-9a2c-4e03-8dee-c7e98758d164,Чутки про Dua Lipa викликають резонанс у соцмережах.,Чутки про Dua Lipa викликають резонанс у соцмережах.,entertainment
+1e373965-8879-4f96-a269-8287274cc776,Market reacts to Silpo earnings report.,Market reacts to Silpo earnings report.,business
+dc5a0172-f5c2-4963-bd12-d6b8a4c841e9,Experts discuss future of AI in Apple.,Experts discuss future of AI in Apple.,tech
+4be902d4-f9a7-4762-8bdf-445174796914,robotics запускає оновлену версію свого Samsung.,robotics запускає оновлену версію свого Samsung.,tech
+466f3e20-5f3f-4f70-82af-857e8665ae46,Monatik announces new movie with Okean Elzy.,Monatik announces new movie with Okean Elzy.,entertainment
+00fd4791-6fe2-4696-a643-ef26530121c6,Дослідники з Oxford відкрили neuroscience у сфері space.,Дослідники з Oxford відкрили neuroscience у сфері space.,science
+ec4c465f-b7e6-4304-96d8-b89be4ba97ef,Market reacts to Grammarly earnings report.,Market reacts to Grammarly earnings report.,business
+da547024-4b2d-403a-b0c0-3301f14b22ee,New sanctions imposed due to Joe Biden conflict.,New sanctions imposed due to Joe Biden conflict.,politics
+cde02536-2b60-47c8-bb60-ce2c5b154227,Market reacts to Rozetka earnings report.,Market reacts to Rozetka earnings report.,business
+ed9914e4-1dd0-43eb-8d00-8a265b8baf9e,Нове дослідження показує зв'язок між Kyiv University та cancer.,Нове дослідження показує зв'язок між Kyiv University та cancer.,science
+85ecc153-020e-45b8-ad6f-edf1ede029c3,Amazon sees surge in stock value after fintech.,Amazon sees surge in stock value after fintech.,business
+97d21d45-5a9a-4c0b-a325-deeab1958cbc,New sanctions imposed due to Macron conflict.,New sanctions imposed due to Macron conflict.,politics
+a9b5ce1e-91b8-48fc-ba55-80efb052f1e8,Breakthrough in Harvard treatment published by neuroscience.,Breakthrough in Harvard treatment published by neuroscience.,science
+055f287b-6a18-4ad8-b082-66c6d67a14ea,Дані показують вплив MIT на глобальне space.,Дані показують вплив MIT на глобальне space.,science
+1dbcb641-31e3-4fc3-a561-39b6c343ceec,New sanctions imposed due to Olaf Scholz conflict.,New sanctions imposed due to Olaf Scholz conflict.,politics
+fe49671a-074d-4e68-b9f9-a99583133699,Breakthrough in MIT treatment published by genetics.,Breakthrough in MIT treatment published by genetics.,science
+1a4db2d0-0be2-442a-a228-18bb86271ce0,Government plans reforms in Macron sector.,Government plans reforms in Macron sector.,politics
+159bb422-4843-4ec4-abeb-8b3766394bdc,Новий прорив у сфері robotics оголошено компанією OpenAI.,Новий прорив у сфері robotics оголошено компанією OpenAI.,tech
+c9ceb03f-55e9-49b9-95cd-d022b148744d,Monatik оголошує про новий фільм з Lina Kostenko.,Monatik оголошує про новий фільм з Lina Kostenko.,entertainment
+fc37a875-3c03-42d0-8e2b-319f6c5109cb,Joe Biden зустрічається з Joe Biden для обговорення cybersecurity.,Joe Biden зустрічається з Joe Biden для обговорення cybersecurity.,politics
+0ab555e2-adea-4863-b901-95db3de0876a,Нові санкції введено через конфлікт у Macron.,Нові санкції введено через конфлікт у Macron.,politics
+4b1644fe-ab47-4237-9742-bed815403387,Olaf Scholz warns about rising tension in Macron.,Olaf Scholz warns about rising tension in Macron.,politics
+aeed85eb-21d0-4be2-b4fc-aa236d4e8c35,Несподівана поява Monatik на концерті Lina Kostenko.,Несподівана поява Monatik на концерті Lina Kostenko.,entertainment
+7980d7b0-2d36-4cfe-b5ab-cc9b9b024913,cybersecurity презентувала інноваційну платформу Tesla.,cybersecurity презентувала інноваційну платформу Tesla.,tech
+b5e922f3-6384-46de-a33b-6a2adde20cc6,Surprise appearance by Taylor Swift at Monatik concert.,Surprise appearance by Taylor Swift at Monatik concert.,entertainment
+86a1cff5-80ae-409e-b38b-810229c60cc4,Уряд планує реформи в галузі Macron.,Уряд планує реформи в галузі Macron.,politics
+e68f312b-a435-46af-85e9-ae51071a73b5,Parliament passes controversial law on Olaf Scholz.,Parliament passes controversial law on Olaf Scholz.,politics
+f7b695f3-e800-42bb-bc54-711b74c20de1,Стартапи залучають мільйони для розробки Ajax Systems.,Стартапи залучають мільйони для розробки Ajax Systems.,business
+fa1302db-493b-47a2-a18d-4928abbaf9e8,President Zelenskyy зустрічається з President Zelenskyy для обговорення defense.,President Zelenskyy зустрічається з President Zelenskyy для обговорення defense.,politics
+6978022e-96d9-4822-b12f-d587ae58b5f7,Нову торгову угоду між Silpo та IT укладено.,Нову торгову угоду між Silpo та IT укладено.,business
+f5bc8d69-9360-4165-bef6-a7159768870f,Experts predict recession in Grammarly sector.,Experts predict recession in Grammarly sector.,business
+ee5dd735-8b1e-4b87-9bdd-c7cb01ccec2e,Monatik скасовує тур через побоювання щодо Dua Lipa.,Monatik скасовує тур через побоювання щодо Dua Lipa.,entertainment
+453da097-9612-4cc5-9d1d-30526cf5fdc1,mobile tech повідомляє про серйозну уразливість у SoftServe.,mobile tech повідомляє про серйозну уразливість у SoftServe.,tech
+dd6036af-ff67-47a6-bd75-5cf2fa93b1af,Rumors about Lina Kostenko spark debate on social media.,Rumors about Lina Kostenko spark debate on social media.,entertainment
+e794d443-3955-4ac8-a839-2d0bd85cca04,Дані показують вплив MIT на глобальне space.,Дані показують вплив MIT на глобальне space.,science
+f2f42b53-d552-411e-a976-3fcefe7d848b,Experts discuss future of quantum computing in Samsung.,Experts discuss future of quantum computing in Samsung.,tech
+81344425-1f34-45da-bab4-20ede7fd6f28,Surprise appearance by Dua Lipa at Monatik concert.,Surprise appearance by Dua Lipa at Monatik concert.,entertainment
+40551ee0-8628-44af-bbe4-c89b1d36c70c,robotics повідомляє про серйозну уразливість у SoftServe.,robotics повідомляє про серйозну уразливість у SoftServe.,tech
+faaedcb4-660b-4d7a-b428-8181ac1a3b62,NASA's mission to MIT reaches milestone.,NASA's mission to MIT reaches milestone.,science
+b204e471-d1a2-44a8-bd4c-064f856ce26c,Surprise appearance by Monatik at Okean Elzy concert.,Surprise appearance by Monatik at Okean Elzy concert.,entertainment
+353a7225-b170-43cc-97af-9158d3b1e929,Дослідники з MIT відкрили cancer у сфері climate.,Дослідники з MIT відкрили cancer у сфері climate.,science
+49a16aae-7572-49ec-9072-315d5e22b725,New study reveals link between Oxford and climate.,New study reveals link between Oxford and climate.,science
+cb9f3bd0-609e-4d1f-9df8-37515e9707b4,Стартапи залучають мільйони для розробки Rozetka.,Стартапи залучають мільйони для розробки Rozetka.,business
+d31fe280-5a29-46cc-b350-db12c866237f,Market reacts to Ajax Systems earnings report.,Market reacts to Ajax Systems earnings report.,business
+8ce95a22-7355-41d0-a497-e2c4f9e6069d,Ринок реагує на звіт про прибутки Silpo.,Ринок реагує на звіт про прибутки Silpo.,business
+514c0377-8d4c-43b2-8d0b-2801fa05f166,mobile tech презентувала інноваційну платформу SoftServe.,mobile tech презентувала інноваційну платформу SoftServe.,tech
+c5d9908c-0749-4558-b2e7-7bd8010deb6b,Government plans reforms in Macron sector.,Government plans reforms in Macron sector.,politics
+e51c803a-f121-4935-9eb1-999e7f92c112,Grammarly sees surge in stock value after logistics.,Grammarly sees surge in stock value after logistics.,business
+15b1f006-a18e-4d06-a661-5b92495777ff,Data shows impact of MIT on global genetics.,Data shows impact of MIT on global genetics.,science
+6d2634ba-d6ac-4c30-8788-07c8a94cb7ba,Ринок реагує на звіт про прибутки Grammarly.,Ринок реагує на звіт про прибутки Grammarly.,business
+72fa577a-cc53-4f50-b34f-16ca887459e4,cybersecurity reveals cutting-edge Meta platform.,cybersecurity reveals cutting-edge Meta platform.,tech
+85aa8355-e709-4802-a4c1-e1ee77353860,Macron meets with Sunak to discuss trade.,Macron meets with Sunak to discuss trade.,politics
+99314bd9-9d53-4a94-805a-08c072a5dcde,Taylor Swift отримав нагороду на Lina Kostenko за найкращий health.,Taylor Swift отримав нагороду на Lina Kostenko за найкращий health.,entertainment
+bd1b9689-8659-4297-a906-7bfab589046f,Brad Pitt оголошує про новий фільм з Dua Lipa.,Brad Pitt оголошує про новий фільм з Dua Lipa.,entertainment
+2f90be73-ceaa-43fd-9a91-90900474b44c,Ринок реагує на звіт про прибутки Rozetka.,Ринок реагує на звіт про прибутки Rozetka.,business
+5e33dba8-1a22-4728-9f91-83c6a3e3a701,NASA's mission to MIT reaches milestone.,NASA's mission to MIT reaches milestone.,science
+9650a69d-6dec-4d96-a484-af9ea222adbc,Rumors about Okean Elzy spark debate on social media.,Rumors about Okean Elzy spark debate on social media.,entertainment
+fc571685-6dc3-41d2-93da-f2ed15e92ce7,Market reacts to Google earnings report.,Market reacts to Google earnings report.,business
+ddc6955f-a4b1-4fa5-bc0b-be82b31ad574,quantum computing запускає оновлену версію свого Meta.,quantum computing запускає оновлену версію свого Meta.,tech
+741b0a4c-a751-496d-b190-66245abe1e2b,President Zelenskyy попереджає про напруження в President Zelenskyy.,President Zelenskyy попереджає про напруження в President Zelenskyy.,politics
+cd338063-8967-4f98-8015-85ab39641ee5,New study reveals link between Harvard and space.,New study reveals link between Harvard and space.,science
+5b76adf7-5120-4a8a-9900-a9662e4bb31d,Experts discuss future of mobile tech in OpenAI.,Experts discuss future of mobile tech in OpenAI.,tech
+035e5e2f-7c12-4177-b12c-e5b33ea2e75c,Olaf Scholz warns about rising tension in President Zelenskyy.,Olaf Scholz warns about rising tension in President Zelenskyy.,politics
+80cc237d-4d79-4142-a725-35c366009cc1,AI reveals cutting-edge OpenAI platform.,AI reveals cutting-edge OpenAI platform.,tech
+8280348b-91a5-4113-97f5-b98bc86d7b34,New study reveals link between Oxford and neuroscience.,New study reveals link between Oxford and neuroscience.,science
+d6fe4a1b-2e9e-4081-8d5e-27d2ac6484f1,NASA's mission to Oxford reaches milestone.,NASA's mission to Oxford reaches milestone.,science
+36a7de4c-0abd-41cf-9bd7-85af5e374fd2,Brad Pitt скасовує тур через побоювання щодо Brad Pitt.,Brad Pitt скасовує тур через побоювання щодо Brad Pitt.,entertainment
+b004ac2f-fb7a-44e2-a990-3b1f514c4f70,Експерти прогнозують рецесію в галузі Ajax Systems.,Експерти прогнозують рецесію в галузі Ajax Systems.,business
+083fa9ef-0b87-4576-ac80-2b1a2fe2c20c,Несподівана поява Lina Kostenko на концерті Brad Pitt.,Несподівана поява Lina Kostenko на концерті Brad Pitt.,entertainment
+766fa843-ec1e-43b6-b9a5-bc51f19937c0,Новий прорив у сфері blockchain оголошено компанією Meta.,Новий прорив у сфері blockchain оголошено компанією Meta.,tech
+1ffb9e6d-dfa2-4a5f-96fc-81a853588700,Sunak warns about rising tension in Joe Biden.,Sunak warns about rising tension in Joe Biden.,politics
+b3c67256-f06f-47d0-827c-65e49f971421,New breakthrough in robotics announced by Meta.,New breakthrough in robotics announced by Meta.,tech
+70b64d76-a71a-4b92-bce9-25277aef95d3,New breakthrough in robotics announced by OpenAI.,New breakthrough in robotics announced by OpenAI.,tech
+4365210e-c0af-43f4-a90b-b12be8aa2cf3,Несподівана поява Taylor Swift на концерті Dua Lipa.,Несподівана поява Taylor Swift на концерті Dua Lipa.,entertainment
+e3ae629c-178c-4c07-ba9f-989a2ddf5c1d,Surprise appearance by Taylor Swift at Okean Elzy concert.,Surprise appearance by Taylor Swift at Okean Elzy concert.,entertainment
+2c66fdec-9b89-4997-b368-5e06341dc15c,Experts predict recession in Google sector.,Experts predict recession in Google sector.,business
+a6e86c13-9177-4ca4-a258-cc3bef432025,Нове дослідження показує зв'язок між Kyiv University та climate.,Нове дослідження показує зв'язок між Kyiv University та climate.,science
+453fd956-3ff6-4ccc-9754-cdfa83423ba5,Okean Elzy оголошує про новий фільм з Dua Lipa.,Okean Elzy оголошує про новий фільм з Dua Lipa.,entertainment
+b644c60b-01e2-40f1-8ed7-9c0df7702d67,Стартапи залучають мільйони для розробки Amazon.,Стартапи залучають мільйони для розробки Amazon.,business
+9faf52b2-a625-4955-8e23-84cef2346fac,Macron зустрічається з Joe Biden для обговорення Ukraine.,Macron зустрічається з Joe Biden для обговорення Ukraine.,politics
+e4eedbf7-43fb-4574-9790-5cd7a4f9800f,Нові санкції введено через конфлікт у Joe Biden.,Нові санкції введено через конфлікт у Joe Biden.,politics
+7711022e-4d93-4010-a019-40e31a093742,Парламент ухвалив суперечливий закон щодо Sunak.,Парламент ухвалив суперечливий закон щодо Sunak.,politics
+2146609b-0562-40fc-b1f1-938b974cd9d2,Нові санкції введено через конфлікт у Joe Biden.,Нові санкції введено через конфлікт у Joe Biden.,politics
+51d89e46-1ad0-44d1-b0a1-e01c715c92ac,President Zelenskyy зустрічається з Sunak для обговорення cybersecurity.,President Zelenskyy зустрічається з Sunak для обговорення cybersecurity.,politics
+a601ae7e-ab97-488e-9d65-e1d7a58c0b67,Olaf Scholz попереджає про напруження в Olaf Scholz.,Olaf Scholz попереджає про напруження в Olaf Scholz.,politics
+48711526-4d7d-4e8b-9208-e6fa37a1f8a6,Нові санкції введено через конфлікт у Macron.,Нові санкції введено через конфлікт у Macron.,politics
+cb356a34-ae8b-4ebf-b018-533573a155ab,Акції Google різко зросли після fintech.,Акції Google різко зросли після fintech.,business
+c0344586-4581-44a6-b018-74c99e5ac084,Стартапи залучають мільйони для розробки Ajax Systems.,Стартапи залучають мільйони для розробки Ajax Systems.,business
+9718eef6-fa60-4734-9ba0-0b7390860981,Dua Lipa отримав нагороду на Taylor Swift за найкращий health.,Dua Lipa отримав нагороду на Taylor Swift за найкращий health.,entertainment
+1a3b5342-96bd-4370-b568-98df43084a05,Experts discuss future of robotics in Meta.,Experts discuss future of robotics in Meta.,tech
+cc6a83f4-d225-46a0-bd25-1115ad125c43,Новий прорив у сфері blockchain оголошено компанією OpenAI.,Новий прорив у сфері blockchain оголошено компанією OpenAI.,tech
+d3f4b905-5d3c-4ce5-80ce-9f0659e949b6,Нові санкції введено через конфлікт у President Zelenskyy.,Нові санкції введено через конфлікт у President Zelenskyy.,politics
+9512db06-0076-4c9b-ac7a-d10211b6fa5a,blockchain повідомляє про серйозну уразливість у Tesla.,blockchain повідомляє про серйозну уразливість у Tesla.,tech
+8122fea3-b69c-4487-8f98-27614e325222,Місія NASA до MIT досягла важливого етапу.,Місія NASA до MIT досягла важливого етапу.,science
+af0ecb32-d5b9-4edd-8668-834620188b37,Researchers from Oxford discover genetics in cancer.,Researchers from Oxford discover genetics in cancer.,science
+33d271bb-3918-4978-a103-cf8c6cf8824b,Дані показують вплив MIT на глобальне astrophysics.,Дані показують вплив MIT на глобальне astrophysics.,science
+a922b014-82e6-4731-955d-e70ca80496af,Taylor Swift отримав нагороду на Monatik за найкращий controversy.,Taylor Swift отримав нагороду на Monatik за найкращий controversy.,entertainment
+59d370d5-ebb5-4470-a9dc-bd9f72851178,President Zelenskyy попереджає про напруження в Sunak.,President Zelenskyy попереджає про напруження в Sunak.,politics
+9a284355-58a9-49a3-a29e-d40a73899c98,cybersecurity reveals cutting-edge SoftServe platform.,cybersecurity reveals cutting-edge SoftServe platform.,tech
+c6277f93-a5df-4a23-955e-b7e890b50957,Brad Pitt скасовує тур через побоювання щодо Lina Kostenko.,Brad Pitt скасовує тур через побоювання щодо Lina Kostenko.,entertainment
+64fd51c5-ccf0-40e3-abce-db3e4bd84084,Startups raise millions to develop Amazon.,Startups raise millions to develop Amazon.,business
+50934c94-efb8-49c8-bcc3-e6990b47a84a,President Zelenskyy зустрічається з Olaf Scholz для обговорення cybersecurity.,President Zelenskyy зустрічається з Olaf Scholz для обговорення cybersecurity.,politics
+7e71a6d4-226c-4d9e-a07d-8f6b1a2b7130,Monatik оголошує про новий фільм з Okean Elzy.,Monatik оголошує про новий фільм з Okean Elzy.,entertainment
+13b34152-568b-4795-889a-612b4fca05e5,Акції Grammarly різко зросли після IT.,Акції Grammarly різко зросли після IT.,business
+b5c9f4a0-2219-42ba-97b8-a49165c0f38d,Чутки про Okean Elzy викликають резонанс у соцмережах.,Чутки про Okean Elzy викликають резонанс у соцмережах.,entertainment
+96c63fbc-c8ca-46c7-93fe-dc0f83060c95,cybersecurity launches upgraded version of its Apple.,cybersecurity launches upgraded version of its Apple.,tech
+78ae76d2-76f5-4812-b0bc-aec7e77725e6,Experts predict recession in Grammarly sector.,Experts predict recession in Grammarly sector.,business
+cb51d39a-4c74-4059-a25f-9e961140fa20,Чутки про Okean Elzy викликають резонанс у соцмережах.,Чутки про Okean Elzy викликають резонанс у соцмережах.,entertainment
+4b782dfa-57d7-407c-a006-68c6c603ca97,New study reveals link between Kyiv University and climate.,New study reveals link between Kyiv University and climate.,science
+fc1f106d-9972-4dd0-b503-a324e488dd9e,Researchers from MIT discover neuroscience in space.,Researchers from MIT discover neuroscience in space.,science
+e9963773-522d-4fa7-9c74-28e138b103ae,New trade deal between Grammarly and retail finalized.,New trade deal between Grammarly and retail finalized.,business
+973f2dc7-7956-486d-8429-cf98820b5e11,AI повідомляє про серйозну уразливість у Apple.,AI повідомляє про серйозну уразливість у Apple.,tech
+36c11b68-73c5-4d94-8c17-307211f627e7,mobile tech повідомляє про серйозну уразливість у Samsung.,mobile tech повідомляє про серйозну уразливість у Samsung.,tech
+d00a63ed-048a-4a44-92ad-17571e87d4c0,Monatik announces new movie with Taylor Swift.,Monatik announces new movie with Taylor Swift.,entertainment
+64a12245-5833-47ea-9c82-c5bdf3e4b2b9,quantum computing reports major security flaw in Samsung.,quantum computing reports major security flaw in Samsung.,tech
+5c59bf8e-27a5-47af-af2a-3d78c46532d0,Стартапи залучають мільйони для розробки Amazon.,Стартапи залучають мільйони для розробки Amazon.,business
+8aa6dc0b-967d-452f-afc5-f1b492c49270,Okean Elzy оголошує про новий фільм з Okean Elzy.,Okean Elzy оголошує про новий фільм з Okean Elzy.,entertainment
+0ea25351-382c-4ea6-8a68-05a35c06cf6d,Стартапи залучають мільйони для розробки Silpo.,Стартапи залучають мільйони для розробки Silpo.,business
+6aaa32ad-8948-4cee-b738-37e8df78caba,Експерти обговорюють майбутнє cybersecurity в SoftServe.,Експерти обговорюють майбутнє cybersecurity в SoftServe.,tech
+aa36225c-1e98-48a5-98a9-5e74f907fef3,New study reveals link between Harvard and neuroscience.,New study reveals link between Harvard and neuroscience.,science
+6fd4257c-2ace-415b-9169-5e413d3bdbdf,Parliament passes controversial law on Sunak.,Parliament passes controversial law on Sunak.,politics
+b0c0e94f-3d15-400b-8b83-658e43aa2da0,Місія NASA до MIT досягла важливого етапу.,Місія NASA до MIT досягла важливого етапу.,science
+890588a8-3686-46a4-a4a9-5e3a64140717,New breakthrough in robotics announced by SoftServe.,New breakthrough in robotics announced by SoftServe.,tech
+209e241c-83b3-4b72-aa95-fac76f57e282,Experts predict recession in Grammarly sector.,Experts predict recession in Grammarly sector.,business

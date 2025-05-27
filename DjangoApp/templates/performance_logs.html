@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Logs</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f7f7f7; }
+
+        nav button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        nav button:hover {
+            background-color: #0056b3;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f0f0f0;
+        }
+
+        .ok { color: green; font-weight: bold; }
+        .slow { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/stream/"><button>⬅ Back to Stream Control</button></a>
+    </nav>
+
+    <div class="card">
+        <h1>Історія продуктивності системи</h1>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Час</th>
+                    <th>Отримано</th>
+                    <th>Класифіковано</th>
+                    <th>Пропускна здатність</th>
+                    <th>Ліміт</th>
+                    <th>Аптайм (сек)</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadLogs() {
+            fetch("{% url 'performance_logs_json' %}")
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById("log-body");
+                    tbody.innerHTML = "";
+                    data.logs.reverse().forEach(log => {
+                        const row = `
+                            <tr>
+                                <td>${log.timestamp}</td>
+                                <td>${log.received}</td>
+                                <td>${log.classified}</td>
+                                <td>${log.throughput}</td>
+                                <td>${log.limit}</td>
+                                <td>${log.uptime}</td>
+                                <td class="${log.status}">${log.status.toUpperCase()}</td>
+                            </tr>`;
+                        tbody.innerHTML += row;
+                    });
+                });
+        }
+
+        loadLogs();
+        setInterval(loadLogs, 10000);
+    </script>
+</body>
+</html>
+
