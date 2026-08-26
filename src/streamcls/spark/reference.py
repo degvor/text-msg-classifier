@@ -21,7 +21,7 @@ from streamcls.spark.features import RAW_FEATURE_COLUMN
 if TYPE_CHECKING:  # pragma: no cover
     from pyspark.sql import DataFrame
 
-__all__ = ["DEFAULT_TOP_TERMS", "build_reference"]
+__all__ = ["DEFAULT_TOP_TERMS", "build_confidence_reference", "build_reference"]
 
 DEFAULT_TOP_TERMS = 50
 
@@ -57,3 +57,33 @@ def build_reference(
     histogram[-1] = max(0.0, histogram[-1])
 
     return top, histogram, vocab_size
+
+
+def build_confidence_reference(predictions: DataFrame, *, bins: int = 10) -> list[float]:
+    """The model's own max-probability profile on held-out data.
+
+    This is the reference a batch's confidence histogram is compared against.
+    Using a uniform reference instead makes the statistic enormous and nearly
+    constant -- a calibrated classifier concentrates mass in the top bins, so
+    the distance to uniform says something about calibration, not about drift.
+    """
+    from pyspark.ml.functions import vector_to_array
+    from pyspark.sql import functions as F
+
+    scored = predictions.withColumn(
+        "_confidence", F.array_max(vector_to_array(F.col("probability")))
+    )
+    aggregations = []
+    for index in range(bins):
+        low, high = index / bins, (index + 1) / bins
+        predicate = (F.col("_confidence") >= low) & (
+            F.col("_confidence") < high if index < bins - 1 else F.col("_confidence") <= high
+        )
+        aggregations.append(F.sum(F.when(predicate, 1).otherwise(0)).alias(f"b{index}"))
+
+    row = scored.agg(*aggregations).first()
+    counts = [float(row[f"b{i}"] or 0) for i in range(bins)]
+    total = sum(counts)
+    if total <= 0:
+        return [1.0 / bins] * bins
+    return [c / total for c in counts]

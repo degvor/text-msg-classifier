@@ -53,7 +53,7 @@ from streamcls.logging import configure, get_logger
 from streamcls.metrics import Evaluation
 from streamcls.spark.evaluate import evaluate_predictions
 from streamcls.spark.features import ALGORITHMS, LABEL_COLUMN, TEXT_COLUMN, build_pipeline
-from streamcls.spark.reference import build_reference
+from streamcls.spark.reference import build_confidence_reference, build_reference
 from streamcls.spark.session import build_session
 
 log = get_logger(__name__)
@@ -71,6 +71,7 @@ class TrainResult:
     vocab_size: int
     top_term_indices: list[int]
     reference_histogram: list[float]
+    confidence_reference: list[float]
     seconds: float
 
 
@@ -172,7 +173,11 @@ def train(
 
         # Tuned on val, scored once on test. Reporting the tuning set as the
         # headline number is the most common way to overstate a result.
-        val_eval = evaluate_predictions(model.transform(val_df))
+        val_predictions = model.transform(val_df).cache()
+        val_eval = evaluate_predictions(val_predictions)
+        # Confidence reference comes from validation, not training: on training
+        # data the model is over-confident, which would set an unreachable bar.
+        confidence_reference = build_confidence_reference(val_predictions)
         test_eval = evaluate_predictions(model.transform(test_df))
         log.info("validation", extra={"accuracy": val_eval.accuracy, "macro_f1": val_eval.macro_f1})
 
@@ -201,6 +206,7 @@ def train(
             vocab_size=vocab_size,
             top_term_indices=top_terms,
             reference_histogram=histogram,
+            confidence_reference=confidence_reference,
             seconds=time.monotonic() - started,
         )
     finally:
@@ -243,6 +249,7 @@ def register(result: TrainResult, settings: Settings, *, promote: bool, min_delt
             vocab_size=result.vocab_size,
             top_term_indices=result.top_term_indices,
             reference_histogram=result.reference_histogram,
+            confidence_reference=result.confidence_reference,
             git_commit=_git_commit(),
         )
         log.info("registered", extra={"model_id": model_id, "version": result.version})

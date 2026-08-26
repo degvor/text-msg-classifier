@@ -20,3 +20,30 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
     ports:
       - "${KAFKA_HOST_PORT:-9094}:9094"
+
+  web:
+    volumes:
+      - ./data:/data
+      - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
+      - ./web:/app/web:ro
+
+  # Live source, so editing streamcls does not require rebuilding the Spark base
+  # image that consumer and trainer both inherit from. Without this a stale
+  # `src` copy inside the image silently shadows local changes.
+  consumer:
+    volumes:
+      - ./data:/data
+      - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
+      - ./services:/app/services:ro
+
+  producer:
+    volumes:
+      - ./data:/data
+      - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
+      - ./services:/app/services:ro
+
+  trainer:
+    volumes:
+      - ./data:/data
+      - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
+      - ./services:/app/services:ro

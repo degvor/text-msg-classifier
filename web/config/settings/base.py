@@ -89,7 +89,9 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# Configurable, and by default *outside* the source tree: collectstatic output
+# is a build artefact, and in dev the source is bind-mounted read-only.
+STATIC_ROOT = Path(os.getenv("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles"))
 STATICFILES_DIRS = [BASE_DIR / "dashboard" / "static"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

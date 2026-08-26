@@ -60,6 +60,7 @@ class ModelRecord:
     vocab_size: int | None
     top_term_indices: list[int]
     reference_histogram: list[float]
+    confidence_reference: list[float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +241,7 @@ class Repository:
         vocab_size: int,
         top_term_indices: list[int],
         reference_histogram: list[float],
+        confidence_reference: list[float],
         created_by_run: int | None = None,
         git_commit: str = "",
     ) -> int:
@@ -256,15 +258,15 @@ class Repository:
                     (version, status, artifact_path, algorithm, hyperparams,
                      test_accuracy, test_macro_f1, metrics, train_rows,
                      vocab_size, top_term_indices, reference_histogram,
-                     created_by_run_id, git_commit, trained_at)
-                VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                     confidence_reference, created_by_run_id, git_commit, trained_at)
+                VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 RETURNING id
                 """,
                 (
                     version, artifact_path, algorithm, Json(hyperparams),
                     test_accuracy, test_macro_f1, Json(metrics), train_rows,
                     vocab_size, Json(top_term_indices), Json(reference_histogram),
-                    created_by_run, git_commit,
+                    Json(confidence_reference), created_by_run, git_commit,
                 ),
             )
             return int(cur.fetchone()["id"])
@@ -274,7 +276,7 @@ class Repository:
             cur.execute(
                 f"""
                 SELECT id, version, status, artifact_path, algorithm, test_accuracy,
-                       vocab_size, top_term_indices, reference_histogram
+                       vocab_size, top_term_indices, reference_histogram, confidence_reference
                 FROM {Table.MODEL_VERSION} WHERE id = %s
                 """,
                 (model_id,),
@@ -289,7 +291,7 @@ class Repository:
             cur.execute(
                 f"""
                 SELECT id, version, status, artifact_path, algorithm, test_accuracy,
-                       vocab_size, top_term_indices, reference_histogram
+                       vocab_size, top_term_indices, reference_histogram, confidence_reference
                 FROM {Table.MODEL_VERSION} WHERE status = 'active'
                 """
             )
@@ -356,6 +358,79 @@ class Repository:
                     f"{Table.STREAM_STATUS} has no row with id=1; cannot signal the consumer"
                 )
         return True
+
+    # --- stream output ------------------------------------------------------
+    def write_batch_metric(self, **fields: Any) -> None:
+        """Upsert one row per micro-batch.
+
+        Upsert rather than insert because a checkpoint replay re-runs
+        ``foreachBatch`` for a batch id that already has a row. Without the
+        conflict clause, cumulative accuracy would drift on every restart.
+        """
+        columns = list(fields)
+        placeholders = ", ".join(["%s"] * len(columns))
+        updatable = [c for c in columns if c not in ("experiment_run_id", "batch_id")]
+        assignments = ", ".join(f"{c} = EXCLUDED.{c}" for c in updatable)
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {Table.BATCH_METRIC} ({", ".join(columns)})
+                VALUES ({placeholders})
+                ON CONFLICT (experiment_run_id, batch_id) DO UPDATE SET {assignments}
+                """,
+                tuple(fields[c] for c in columns),
+            )
+
+    def batch_metric_exists(self, run_id: int, batch_id: int) -> bool:
+        """Has this batch already been processed? Distinguishes a replay."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"SELECT 1 FROM {Table.BATCH_METRIC} WHERE experiment_run_id = %s AND batch_id = %s",
+                (run_id, batch_id),
+            )
+            return cur.fetchone() is not None
+
+    def batch_metrics_since(
+        self, run_id: int, *, after_batch: int = -1
+    ) -> list[dict[str, Any]]:
+        """Ordered history, for rebuilding detector state after a restart.
+
+        Replay beats pickling detector objects: river's internals are not a
+        documented, version-stable contract, and a stored blob cannot be
+        inspected or reasoned about. ``correct_bits`` makes the replay exact.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT batch_id, n_classified, n_correct, mean_confidence, correct_bits
+                FROM {Table.BATCH_METRIC}
+                WHERE experiment_run_id = %s AND batch_id > %s
+                ORDER BY batch_id
+                """,
+                (run_id, after_batch),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+    def record_stream_error(self, message: str) -> None:
+        with self.cursor() as cur:
+            cur.execute(
+                f"UPDATE {Table.STREAM_STATUS} SET last_error = %s WHERE id = 1",
+                (message[:2000],),
+            )
+
+    def set_active_model(self, model_id: int | None) -> None:
+        with self.cursor() as cur:
+            cur.execute(
+                f"UPDATE {Table.STREAM_STATUS} SET active_model_version_id = %s WHERE id = 1",
+                (model_id,),
+            )
+
+    def set_stream_active(self, active: bool) -> None:
+        with self.cursor() as cur:
+            cur.execute(
+                f"UPDATE {Table.STREAM_STATUS} SET is_active = %s WHERE id = 1",
+                (active,),
+            )
 
     def set_producer_active(self, active: bool) -> None:
         with self.cursor() as cur:

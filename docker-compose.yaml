@@ -111,6 +111,30 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  consumer:
+    build:
+      context: .
+      dockerfile: docker/consumer.Dockerfile
+    environment:
+      <<: [*postgres-env, *kafka-env]
+      STREAMCLS_DATA_ROOT: /data
+      SPARK_LOCAL_IP: 127.0.0.1
+      SPARK_MASTER: ${SPARK_MASTER:-local[4]}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-3g}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    # The old spark service had no restart policy at all, so the first
+    # unhandled exception was a permanent outage.
+    restart: unless-stopped
+
   # Behind a profile: training is an explicit action, not something that runs
   # on `up`. Shares the Spark base image with the consumer, so Spark and jar
   # versions are pinned in exactly one place.

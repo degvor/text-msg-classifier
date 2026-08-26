@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
 
 from streamcls.db.tables import Table
 
@@ -284,6 +284,12 @@ class ModelVersion(models.Model):
     #: this model's vocabulary. Swaps with the model, because PSI is defined
     #: relative to *this* model's training distribution.
     reference_histogram = models.JSONField(default=list, blank=True)
+    #: The model's own confidence profile on held-out data. Comparing a batch
+    #: against a *uniform* reference is meaningless -- a calibrated model
+    #: concentrates mass in the top bins, so the PSI is enormous and constant.
+    #: Against this, movement means "the model has become less sure than it
+    #: normally is", which is a usable label-free drift proxy.
+    confidence_reference = models.JSONField(default=list, blank=True)
 
     created_by_run = models.ForeignKey(
         ExperimentRun, null=True, blank=True, on_delete=models.SET_NULL, related_name="models"
@@ -368,9 +374,9 @@ class ClassifiedMessage(models.Model):
     msg_index = models.IntegerField()
 
     post_text = models.TextField()
-    channel_title = models.CharField(max_length=255, blank=True, default="")
-    channel_id = models.CharField(max_length=64, blank=True, default="")
-    view_count = models.IntegerField(default=0)
+    channel_title = models.CharField(max_length=255, blank=True, default="", db_default="")
+    channel_id = models.CharField(max_length=64, blank=True, default="", db_default="")
+    view_count = models.IntegerField(default=0, db_default=0)
 
     true_label = models.ForeignKey(
         Category, on_delete=models.PROTECT, related_name="+", db_column="true_label_id"
@@ -393,8 +399,8 @@ class ClassifiedMessage(models.Model):
     batch_id = models.BigIntegerField()
 
     # Ground truth about the injected drift, for evaluation only.
-    perturbation_kind = models.CharField(max_length=32, default="none")
-    drift_phase = models.IntegerField(default=0)
+    perturbation_kind = models.CharField(max_length=32, default="none", db_default="none")
+    drift_phase = models.IntegerField(default=0, db_default=0)
 
     produced_at = models.DateTimeField()
     classified_at = models.DateTimeField()
@@ -439,21 +445,25 @@ class BatchMetric(models.Model):
     )
 
     started_at = models.DateTimeField()
-    duration_ms = models.IntegerField(default=0)
+    # db_default, not just default: Django's `default=` is applied in Python, so
+    # a raw-SQL writer that omits the column hits a NOT NULL violation. This
+    # table is written by the Spark consumer over psycopg2, not through the ORM,
+    # so every nullable-by-intent column needs a database-level default.
+    duration_ms = models.IntegerField(default=0, db_default=0)
 
     # --- volume: counted separately, unlike before ---------------------------
     n_received = models.IntegerField(help_text="Rows read from Kafka, before filtering.")
     n_classified = models.IntegerField(help_text="Rows that survived filtering and were scored.")
-    n_correct = models.IntegerField(default=0)
+    n_correct = models.IntegerField(default=0, db_default=0)
     accuracy = models.FloatField(null=True, blank=True)
     cumulative_accuracy = models.FloatField(null=True, blank=True)
 
     # --- distributions -------------------------------------------------------
     mean_confidence = models.FloatField(null=True, blank=True)
     std_confidence = models.FloatField(null=True, blank=True)
-    confidence_hist = models.JSONField(default=list, blank=True)
-    predicted_hist = models.JSONField(default=list, blank=True)
-    true_hist = models.JSONField(default=list, blank=True)
+    confidence_hist = models.JSONField(default=list, blank=True, db_default=Value([], models.JSONField()))
+    predicted_hist = models.JSONField(default=list, blank=True, db_default=Value([], models.JSONField()))
+    true_hist = models.JSONField(default=list, blank=True, db_default=Value([], models.JSONField()))
 
     # --- drift statistics ----------------------------------------------------
     psi_vocabulary = models.FloatField(null=True, blank=True)
@@ -462,7 +472,7 @@ class BatchMetric(models.Model):
     js_vocabulary = models.FloatField(null=True, blank=True)
     adwin_estimate = models.FloatField(null=True, blank=True)
     adwin_width = models.IntegerField(null=True, blank=True)
-    ddm_warning = models.BooleanField(default=False)
+    ddm_warning = models.BooleanField(default=False, db_default=False)
 
     #: One bit per message: was the prediction correct. 500 messages = 63 bytes.
     #: Lets detector state be rebuilt *exactly* by replay after a restart,

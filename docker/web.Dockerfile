@@ -4,7 +4,8 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    DJANGO_SETTINGS_MODULE=config.settings.dev
+    DJANGO_SETTINGS_MODULE=config.settings.dev \
+    DJANGO_STATIC_ROOT=/app/staticfiles
 
 WORKDIR /app
 
@@ -15,7 +16,7 @@ RUN pip install --no-cache-dir "/app[web]"
 COPY web /app/web
 
 RUN useradd --create-home --uid 10003 web \
-    && mkdir -p /data /app/web/staticfiles \
+    && mkdir -p /data /app/staticfiles \
     && chown -R web:web /data /app
 USER web
 WORKDIR /app/web

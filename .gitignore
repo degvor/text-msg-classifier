@@ -39,6 +39,7 @@ data/*
 
 # Django collectstatic output is a build artefact.
 web/staticfiles/
+staticfiles/
 DjangoApp/staticfiles/
 
 # Legacy layout, removed during the rework. Kept here so a stale working tree

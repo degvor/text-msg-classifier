@@ -53,6 +53,7 @@ def _register(repo, version: str, accuracy: float) -> int:
         vocab_size=20_000,
         top_term_indices=[1, 2, 3],
         reference_histogram=[0.5, 0.3, 0.2],
+        confidence_reference=[0.1] * 10,
     )
 
 
@@ -131,6 +132,9 @@ def test_get_active_model_round_trips_the_drift_reference(repo):
     assert active.version == "v1"
     assert active.reference_histogram == [0.5, 0.3, 0.2]
     assert active.top_term_indices == [1, 2, 3]
+    # The confidence reference must travel with the model too: comparing a
+    # batch against a uniform profile measures calibration, not drift.
+    assert active.confidence_reference == [0.1] * 10
     assert active.vocab_size == 20_000
 
 
