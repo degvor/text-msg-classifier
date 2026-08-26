@@ -73,6 +73,7 @@ ignore = [
 "tests/*" = ["T20"]                    # prints are fine in tests
 "services/*/main.py" = ["T20"]
 "web/manage.py" = ["T20"]
+"src/streamcls/corpus/__main__.py" = ["T20"]   # it is a CLI; printing is the point
 # Django's Meta and ModelAdmin classes are declarative: list/dict class
 # attributes are the documented API, not accidental mutable state.
 "web/**/models.py" = ["RUF012"]

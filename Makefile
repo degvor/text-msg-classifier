@@ -1,7 +1,7 @@
 # Development entrypoints. Spark work runs in Docker because there is no local JRE.
 .DEFAULT_GOAL := help
 .PHONY: help env install lint fmt typecheck test test-unit test-integration test-spark \
-        build up down logs ps shell-spark clean-pyc
+        data data-info build up down logs ps shell-spark clean-pyc
 
 VENV    := .venv
 PY      := $(VENV)/bin/python
@@ -20,6 +20,12 @@ env: ## Create .env from .env.example (never overwrites)
 install: ## Create the venv and install streamcls with dev extras
 	uv venv --python 3.11 $(VENV)
 	uv pip install --python $(VENV) -e ".[dev,db,producer]"
+
+data: ## Download AG News (idempotent, checksum-verified)
+	$(PY) -m streamcls.corpus download
+
+data-info: ## Show split sizes, balance and leakage check
+	$(PY) -m streamcls.corpus splits
 
 lint: ## ruff check
 	$(RUFF) check src services web tests

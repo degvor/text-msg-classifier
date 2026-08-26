@@ -1,117 +1,116 @@
-version: '3.8'
+# The previous compose file could not build: bitnami/spark:3.4.1 has been
+# removed from Docker Hub. It also ran Kafka on ZooKeeper (removed in Kafka 4),
+# carried the obsolete `version:` key, bind-mounted a ./test_data directory that
+# does not exist, hardcoded credentials in five places, and published Postgres
+# and Kafka to the host.
+
+name: streamcls
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-streamdb}
+  POSTGRES_USER: ${POSTGRES_USER:-streamuser}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_TOPIC: ${KAFKA_TOPIC:-posts}
+
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    hostname: zookeeper
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    healthcheck:
-      test: nc -z localhost 2181 || exit -1
-      start_period: 15s
-      interval: 5s
-      timeout: 10s
-      retries: 10
-
-  kafka:
-    image: confluentinc/cp-kafka:7.4.0
-    hostname: kafka
-    container_name: kafka
-    depends_on:
-      zookeeper:
-        condition: service_healthy
-    ports:
-      - "9092:9092"
-      - "9094:9094"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: kafka-topics --bootstrap-server kafka:9092 --list
-      start_period: 30s
-      interval: 5s
-      timeout: 10s
-      retries: 10
-
-  spark:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: spark
-    depends_on:
-      kafka:
-        condition: service_healthy
-    volumes:
-      - ./app:/app
-      - ./data:/data
-    environment:
-      - SPARK_DRIVER_MEMORY=2g
-      - SPARK_EXECUTOR_MEMORY=2g
-
-  kafka-producer:
-    build:
-      context: .
-      dockerfile: Dockerfile.producer
-    container_name: kafka-producer
-    depends_on:
-      kafka:
-        condition: service_healthy
-    volumes:
-      - ./test_data:/test_data
-      - ./producer:/producer
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    restart: unless-stopped
-
-  train-model:
-    build:
-      context: .
-      dockerfile: train_data/Dockerfile.train
-    container_name: model_trainer
-    command: spark-submit /train_data/train_classifier.py
-    volumes:
-      - ./train_data:/train_data
-      - ./data:/data
-    profiles:
-      - manual
-
   db:
     image: postgres:15
-    container_name: postgres_db
     environment:
-      POSTGRES_DB: streamdb
-      POSTGRES_USER: streamuser
-      POSTGRES_PASSWORD: streampass
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-streamdb}
+      POSTGRES_USER: ${POSTGRES_USER:-streamuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-streamuser} -d ${POSTGRES_DB:-streamdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
 
-  django:
-    build:
-      context: ./DjangoApp
-    container_name: django_app
-    #command: python manage.py runserver 0.0.0.0:8000
+  # KRaft mode: no ZooKeeper. ZooKeeper was deprecated in Kafka 3.5 and removed
+  # in 4.0, and it was an entire service carried for nothing.
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Experiments run on one partition so micro-batch composition is
+      # deterministic. Scalability benchmarks override this explicitly.
+      KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS:-1}
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 48
     volumes:
-      - ./DjangoApp:/app
-      - ./data:/app/data
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    environment:
+      <<: *postgres-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      STREAMCLS_DATA_ROOT: /data
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
+    volumes:
+      - ./data:/data
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/admin/login/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  producer:
+    build:
+      context: .
+      dockerfile: docker/producer.Dockerfile
     environment:
-      DJANGO_SETTINGS_MODULE: DjangoApp.settings
+      <<: [*postgres-env, *kafka-env]
+      STREAMCLS_DATA_ROOT: /data
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      # Wait for migrations, so the producer never reads a half-built schema.
+      web:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pg_data:
+  kafka_data:

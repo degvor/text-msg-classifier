@@ -1,0 +1,22 @@
+# Local development only. Picked up automatically by `docker compose`; CI and
+# any real deployment use `docker compose -f docker-compose.yaml` alone.
+#
+# The base file deliberately does not publish Postgres or Kafka to the host --
+# the previous setup exposed both with weak credentials over PLAINTEXT and no
+# network segmentation. Here they are published so host-side integration tests
+# and psql/kafka CLIs can reach them.
+
+services:
+  db:
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+
+  kafka:
+    environment:
+      # A second listener advertised as localhost, so clients on the host
+      # resolve the broker correctly after the initial metadata exchange.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+    ports:
+      - "${KAFKA_HOST_PORT:-9094}:9094"
