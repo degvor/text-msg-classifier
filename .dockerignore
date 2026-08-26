@@ -1,0 +1,29 @@
+.git
+.gitignore
+.idea
+.vscode
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# The build context must never carry generated data. Before this file existed,
+# every build shipped ~11 MB and 2600 files (models, checkpoints, corpora) to
+# the Docker daemon.
+data
+web/staticfiles
+DjangoApp/staticfiles
+
+.env
+.env.*
+!.env.example
+CLAUDE.md
+README.md
+docs
+tests

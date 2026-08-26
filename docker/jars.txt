@@ -1,0 +1,13 @@
+# Runtime jars baked into the Spark image, with SHA-1 from Maven Central.
+#
+# Previously these were resolved by Ivy (`spark.jars.packages`) on *every*
+# container start, so a cold start needed internet and had unbounded latency;
+# Spark NLP was fetched by a bare `curl -o` with no -f, no checksum and no
+# retry, which happily writes an HTML error page into a .jar and exits 0.
+#
+# Format: <sha1>  <maven path under repo1.maven.org/maven2>
+17ef44bb094642e6cbe4c31283b49b0e524225a3  org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.9/spark-sql-kafka-0-10_2.12-3.5.9.jar
+a925bf703b98506dd130cb56584eb2e8bd325380  org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.9/spark-token-provider-kafka-0-10_2.12-3.5.9.jar
+a2f55251deb3d31a21903a0cfbd4d1fa6b7463ca  org/apache/kafka/kafka-clients/3.4.1/kafka-clients-3.4.1.jar
+8970fd110c965f285ed4c6e40be7630c62db6f68  org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar
+a6e1bd21b412d6ffb3df23cd13d507bc2cc9e37d  org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar

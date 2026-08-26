@@ -1,0 +1,111 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "streamcls"
+version = "0.1.0"
+description = "Streaming text classification with online concept-drift detection and adaptation"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+# Base dependencies are deliberately tiny and pure-Python: every service
+# installs them, including the Django image, which must not pull pyspark.
+dependencies = [
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.6,<3",
+    "python-json-logger>=2.0.7,<4",
+]
+
+[project.optional-dependencies]
+# Anything that talks to Postgres directly (consumer, trainer). Django brings
+# its own copy via the `web` extra.
+db = ["psycopg2-binary>=2.9.10,<3"]
+
+# Spark 3.5.x line. The Kafka connector and JDBC driver are baked into the
+# image as jars (see docker/spark-base.Dockerfile) rather than resolved by Ivy
+# at every container start, so they are not listed here.
+spark = [
+    "pyspark==3.5.9",
+    "numpy>=1.26,<3",
+    "psycopg2-binary>=2.9.10,<3",
+]
+
+# Optional. The default feature pipeline uses native Spark ML stages
+# (RegexTokenizer / StopWordsRemover / CountVectorizer / IDF), which removes an
+# entire class of jar-version mismatch. Spark NLP is only needed for the
+# embedding variants in the model comparison.
+nlp = ["spark-nlp==5.5.3"]
+
+web = [
+    "Django==5.2.17",
+    "psycopg2-binary>=2.9.10,<3",
+    "gunicorn>=23.0,<24",
+]
+
+producer = ["kafka-python>=2.3.2,<3"]
+
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-cov>=6.0,<8",
+    "pytest-django>=4.9,<5",
+    "ruff>=0.8,<1",
+    "mypy>=1.13,<2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/streamcls"]
+
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "services", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "DTZ", "T20"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B008",    # FastAPI/Django-style callable defaults are fine here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["T20"]                    # prints are fine in tests
+"services/*/main.py" = ["T20"]
+"web/manage.py" = ["T20"]
+# Django's Meta and ModelAdmin classes are declarative: list/dict class
+# attributes are the documented API, not accidental mutable state.
+"web/**/models.py" = ["RUF012"]
+"web/**/admin.py" = ["RUF012"]
+"web/config/settings/*.py" = ["F403", "F405", "E402"]
+"web/**/migrations/*.py" = ["I001", "E501", "RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["streamcls"]
+
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "web"]
+addopts = "-q --strict-markers"
+# DJANGO_SETTINGS_MODULE is deliberately NOT set here. Unit tests are pure
+# Python and must run with no Django and no database; the integration suite
+# passes --ds explicitly (see the Makefile).
+markers = [
+    "integration: requires Docker (Kafka + Postgres). Deselect with -m 'not integration'.",
+    "spark: requires a JVM. Runs only inside the Spark image.",
+]
+
+# -----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+packages = ["streamcls"]
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+# pyspark ships no usable stubs.
+[[tool.mypy.overrides]]
+module = ["pyspark.*", "sparknlp.*", "kafka.*", "psycopg2.*"]
+ignore_missing_imports = true

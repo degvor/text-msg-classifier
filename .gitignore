@@ -1,0 +1,46 @@
+# --- Editors -----------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# --- Agent scratch -----------------------------------------------------------
+CLAUDE.md
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# --- Tooling caches ----------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ivy2/
+
+# --- Secrets -----------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Runtime + generated data ------------------------------------------------
+# Everything under data/ is generated: corpora are downloaded, models are
+# trained, checkpoints are written by Spark. None of it belongs in git.
+data/*
+!data/.gitkeep
+
+# Django collectstatic output is a build artefact.
+web/staticfiles/
+DjangoApp/staticfiles/
+
+# Legacy layout, removed during the rework. Kept here so a stale working tree
+# does not re-stage 2600 generated files.
+train_data/tokenized_posts_labeled.csv
