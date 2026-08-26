@@ -28,6 +28,11 @@ db = ["psycopg2-binary>=2.9.10,<3"]
 spark = [
     "pyspark==3.5.9",
     "numpy>=1.26,<3",
+    # pyspark.ml.functions (vector_to_array, used to read prediction confidence
+    # out of the probability vector) imports pandas; pyarrow makes the
+    # JVM<->Python transfer columnar rather than row-by-row.
+    "pandas>=2.2,<3",
+    "pyarrow>=17,<22",
     "psycopg2-binary>=2.9.10,<3",
 ]
 

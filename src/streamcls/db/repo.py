@@ -21,11 +21,12 @@ from typing import Any
 
 import psycopg2
 import psycopg2.extras
+from psycopg2.extras import Json
 
 from streamcls.config import PostgresSettings
 from streamcls.db.tables import Table
 
-__all__ = ["ControlState", "Repository", "RunSpec"]
+__all__ = ["ControlState", "ModelRecord", "Repository", "RunSpec"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,21 @@ class ControlState:
             self.desired_model_version_id is not None
             and self.desired_model_version_id != self.active_model_version_id
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ModelRecord:
+    """A registered model, as the consumer and trainer see it."""
+
+    id: int
+    version: str
+    status: str
+    artifact_path: str
+    algorithm: str
+    test_accuracy: float | None
+    vocab_size: int | None
+    top_term_indices: list[int]
+    reference_histogram: list[float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +108,28 @@ class Repository:
             # socket that is already gone.
             self.close()
             raise
+
+    @contextlib.contextmanager
+    def transaction(self) -> Iterator[psycopg2.extensions.cursor]:
+        """Run several statements atomically.
+
+        The connection is normally in autocommit mode, where psycopg2's own
+        ``with connection:`` block does *not* open a transaction -- every
+        statement has already been committed by the time the block ends. So
+        autocommit is turned off for the duration and restored afterwards.
+        """
+        conn = self.connection
+        previous = conn.autocommit
+        conn.autocommit = False
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                yield cur
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.autocommit = previous
 
     def close(self) -> None:
         if self._conn is not None and not self._conn.closed:
@@ -186,6 +224,138 @@ class Repository:
                 """,
                 (last_batch_id,),
             )
+
+    # --- model registry -----------------------------------------------------
+    def register_model(
+        self,
+        *,
+        version: str,
+        artifact_path: str,
+        algorithm: str,
+        hyperparams: dict[str, Any],
+        metrics: dict[str, Any],
+        test_accuracy: float,
+        test_macro_f1: float,
+        train_rows: int,
+        vocab_size: int,
+        top_term_indices: list[int],
+        reference_histogram: list[float],
+        created_by_run: int | None = None,
+        git_commit: str = "",
+    ) -> int:
+        """Insert a ``ready`` model version and return its id.
+
+        Status is ``ready``, never ``active``: promotion is a separate,
+        guarded transaction, so an unverified model can never take over serving
+        merely by finishing training.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {Table.MODEL_VERSION}
+                    (version, status, artifact_path, algorithm, hyperparams,
+                     test_accuracy, test_macro_f1, metrics, train_rows,
+                     vocab_size, top_term_indices, reference_histogram,
+                     created_by_run_id, git_commit, trained_at)
+                VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                RETURNING id
+                """,
+                (
+                    version, artifact_path, algorithm, Json(hyperparams),
+                    test_accuracy, test_macro_f1, Json(metrics), train_rows,
+                    vocab_size, Json(top_term_indices), Json(reference_histogram),
+                    created_by_run, git_commit,
+                ),
+            )
+            return int(cur.fetchone()["id"])
+
+    def get_model(self, model_id: int) -> ModelRecord:
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT id, version, status, artifact_path, algorithm, test_accuracy,
+                       vocab_size, top_term_indices, reference_histogram
+                FROM {Table.MODEL_VERSION} WHERE id = %s
+                """,
+                (model_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            raise LookupError(f"model version {model_id} not found")
+        return ModelRecord(**row)
+
+    def get_active_model(self) -> ModelRecord | None:
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT id, version, status, artifact_path, algorithm, test_accuracy,
+                       vocab_size, top_term_indices, reference_histogram
+                FROM {Table.MODEL_VERSION} WHERE status = 'active'
+                """
+            )
+            row = cur.fetchone()
+        return ModelRecord(**row) if row else None
+
+    def promote_model(self, model_id: int, *, min_delta: float = 0.0) -> bool:
+        """Make ``model_id`` the active version, if it is not clearly worse.
+
+        The guard exists because without it a retrain on an unlucky window
+        makes the system worse and it oscillates -- which would show up in the
+        thesis as adaptation actively hurting. With it, adaptation is monotone
+        by construction, and a rejected promotion is itself evidence the guard
+        works.
+
+        Retire-then-activate happens in one transaction because
+        ``only_one_active_model_version`` is a real constraint.
+        """
+        with self.transaction() as cur:
+            # FOR UPDATE: two concurrent promotions must not both pass the
+            # guard and then collide on the single-active constraint.
+            cur.execute(
+                f"SELECT id, test_accuracy FROM {Table.MODEL_VERSION} WHERE id = %s FOR UPDATE",
+                (model_id,),
+            )
+            candidate = cur.fetchone()
+            if candidate is None:
+                raise LookupError(f"model version {model_id} not found")
+
+            cur.execute(
+                f"""
+                SELECT id, test_accuracy FROM {Table.MODEL_VERSION}
+                WHERE status = 'active' FOR UPDATE
+                """
+            )
+            incumbent = cur.fetchone()
+
+            if incumbent is not None and incumbent["id"] != model_id:
+                new_score = candidate["test_accuracy"] or 0.0
+                old_score = incumbent["test_accuracy"] or 0.0
+                if new_score < old_score - min_delta:
+                    return False
+                cur.execute(
+                    f"UPDATE {Table.MODEL_VERSION} SET status = 'retired' WHERE id = %s",
+                    (incumbent["id"],),
+                )
+
+            cur.execute(
+                f"""
+                UPDATE {Table.MODEL_VERSION}
+                SET status = 'active', activated_at = now() WHERE id = %s
+                """,
+                (model_id,),
+            )
+            cur.execute(
+                f"UPDATE {Table.STREAM_STATUS} SET desired_model_version_id = %s WHERE id = 1",
+                (model_id,),
+            )
+            if cur.rowcount != 1:
+                # Without this the promotion "succeeds" while the consumer is
+                # never told, so the new model is active in the registry and
+                # never actually serves. Silent, and very hard to spot.
+                raise RuntimeError(
+                    f"{Table.STREAM_STATUS} has no row with id=1; cannot signal the consumer"
+                )
+        return True
 
     def set_producer_active(self, active: bool) -> None:
         with self.cursor() as cur:

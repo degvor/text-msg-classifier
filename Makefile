@@ -1,7 +1,7 @@
 # Development entrypoints. Spark work runs in Docker because there is no local JRE.
 .DEFAULT_GOAL := help
 .PHONY: help env install lint fmt typecheck test test-unit test-integration test-spark \
-        data data-info build up down logs ps shell-spark clean-pyc
+        data data-info train build up down logs ps shell-spark clean-pyc
 
 VENV    := .venv
 PY      := $(VENV)/bin/python
@@ -26,6 +26,10 @@ data: ## Download AG News (idempotent, checksum-verified)
 
 data-info: ## Show split sizes, balance and leakage check
 	$(PY) -m streamcls.corpus splits
+
+train: ## Train on AG News and register the model (A=algorithm, PROMOTE=1)
+	docker compose --profile manual run --rm trainer \
+	  python3 -m services.trainer.train --algorithm $(or $(A),logreg) $(if $(PROMOTE),--promote,)
 
 lint: ## ruff check
 	$(RUFF) check src services web tests

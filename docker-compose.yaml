@@ -111,6 +111,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Behind a profile: training is an explicit action, not something that runs
+  # on `up`. Shares the Spark base image with the consumer, so Spark and jar
+  # versions are pinned in exactly one place.
+  trainer:
+    build:
+      context: .
+      dockerfile: docker/trainer.Dockerfile
+    profiles: [manual]
+    environment:
+      <<: *postgres-env
+      STREAMCLS_DATA_ROOT: /data
+      SPARK_LOCAL_IP: 127.0.0.1
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-3g}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pg_data:
   kafka_data:
