@@ -35,6 +35,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Directly after SecurityMiddleware, per WhiteNoise's documentation.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,6 +95,15 @@ STATIC_URL = "static/"
 # is a build artefact, and in dev the source is bind-mounted read-only.
 STATIC_ROOT = Path(os.getenv("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles"))
 STATICFILES_DIRS = [BASE_DIR / "dashboard" / "static"]
+
+# Compressed variants served automatically. The *manifest* variant, which adds
+# content hashes to filenames, is production-only (see settings/prod.py): it
+# requires collectstatic to have run, and raises on any missing entry -- which
+# would make the test suite and a fresh checkout fail for no useful reason.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

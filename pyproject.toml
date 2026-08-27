@@ -44,6 +44,9 @@ nlp = ["spark-nlp==5.5.3"]
 
 web = [
     "Django==5.2.17",
+    # gunicorn does not serve static files (runserver did, which is why the
+    # previous setup appeared to work while running the dev server in prod).
+    "whitenoise>=6.8,<7",
     "psycopg2-binary>=2.9.10,<3",
     "gunicorn>=23.0,<24",
 ]
@@ -87,6 +90,7 @@ ignore = [
 # attributes are the documented API, not accidental mutable state.
 "web/**/models.py" = ["RUF012"]
 "web/**/admin.py" = ["RUF012"]
+"web/**/forms.py" = ["RUF012"]      # Meta.fields is Django's declarative API
 "web/config/settings/*.py" = ["F403", "F405", "E402"]
 "web/**/migrations/*.py" = ["I001", "E501", "RUF012"]
 

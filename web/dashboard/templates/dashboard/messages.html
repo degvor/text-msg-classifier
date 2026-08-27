@@ -1,0 +1,30 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Messages · Stream classification{% endblock %}
+{% block heading %}Messages{% endblock %}
+{% block content %}
+<section class="card">
+  <form class="filters" id="message-filters" onsubmit="return false;">
+    <label>Search<input type="search" id="f-q" placeholder="Text contains…" maxlength="200"></label>
+    <label>Category
+      <select id="f-category">
+        <option value="">All</option>
+        {% for c in categories %}<option value="{{ c.id }}">{{ c.display_name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="f-errors"> Errors only</label>
+    <button type="button" class="btn btn-primary" id="f-apply">Apply</button>
+    <span class="hint" id="result-count"></span>
+  </form>
+  <div class="table-wrap">
+    <table class="table" id="messages-table">
+      <thead><tr><th>#</th><th>Text</th><th>True</th><th>Predicted</th><th>Conf.</th><th>Model</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <button type="button" class="btn btn-ghost" id="prev-page">Previous</button>
+    <span id="page-info" class="hint"></span>
+    <button type="button" class="btn btn-ghost" id="next-page">Next</button>
+  </div>
+</section>
+{% endblock %}

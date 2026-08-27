@@ -1,0 +1,56 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Settings · Stream classification{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block content %}
+{% if not user.is_staff %}
+  <p class="notice">Sign in as staff to change these.</p>
+{% endif %}
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head"><h2>Stream configuration</h2></div>
+    <form id="config-form" class="form" onsubmit="return false;">
+      <div class="form-grid">
+        <label>Max message length<input type="number" name="max_message_length" value="{{ config.max_message_length }}" min="1"></label>
+        <label>Offsets per trigger<input type="number" name="max_offsets_per_trigger" value="{{ config.max_offsets_per_trigger }}" min="1"></label>
+        <label>Trigger seconds<input type="number" name="trigger_seconds" value="{{ config.trigger_seconds }}" min="1"></label>
+        <label>ADWIN delta<input type="number" step="0.0001" name="adwin_delta" value="{{ config.adwin_delta }}"></label>
+        <label>PSI threshold<input type="number" step="0.01" name="psi_threshold" value="{{ config.psi_threshold }}"></label>
+        <label>PSI consecutive batches<input type="number" name="psi_consecutive_batches" value="{{ config.psi_consecutive_batches }}" min="1"></label>
+        <label>Grace batches<input type="number" name="grace_batches" value="{{ config.grace_batches }}" min="0"></label>
+        <label>Promote min delta<input type="number" step="0.001" name="promote_min_delta" value="{{ config.promote_min_delta }}"></label>
+        <label>Min batches between retrains<input type="number" name="min_batches_between_retrains" value="{{ config.min_batches_between_retrains }}" min="0"></label>
+        <label>Max retrains per run<input type="number" name="max_retrains_per_run" value="{{ config.max_retrains_per_run }}" min="0"></label>
+        <label>Retrain window rows<input type="number" name="retrain_window_rows" value="{{ config.retrain_window_rows }}" min="1"></label>
+        <label>Retrain base rows<input type="number" name="retrain_base_rows" value="{{ config.retrain_base_rows }}" min="0"></label>
+        <label>Retrain min new rows<input type="number" name="retrain_min_new_rows" value="{{ config.retrain_min_new_rows }}" min="0"></label>
+        <label class="check"><input type="checkbox" name="adaptation_enabled" {% if config.adaptation_enabled %}checked{% endif %}> Adaptation enabled</label>
+        <label class="check"><input type="checkbox" name="auto_promote" {% if config.auto_promote %}checked{% endif %}> Auto-promote</label>
+      </div>
+      <button type="button" class="btn btn-primary" id="save-config" {% if not user.is_staff %}disabled{% endif %}>Save</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Categories</h2><p class="hint">Ids are pinned in code and cannot change.</p></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Id</th><th>Key</th><th>Name</th><th>Colour</th></tr></thead>
+        <tbody>
+          {% for c in categories %}
+          <tr data-category="{{ c.id }}">
+            <td>{{ c.id }}</td>
+            <td><code>{{ c.key }}</code></td>
+            <td><input type="text" class="cat-name" value="{{ c.display_name }}" {% if not user.is_staff %}disabled{% endif %}></td>
+            <td>
+              <span class="swatch" style="--swatch: {{ c.color }}"></span>
+              <input type="color" class="cat-color" value="{{ c.color }}" {% if not user.is_staff %}disabled{% endif %}>
+              <button type="button" class="btn btn-ghost btn-sm cat-save" {% if not user.is_staff %}disabled{% endif %}>Save</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

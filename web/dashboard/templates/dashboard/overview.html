@@ -1,0 +1,33 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Overview · Stream classification{% endblock %}
+{% block heading %}Overview{% endblock %}
+{% block content %}
+<section class="stat-row" id="stats"></section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Accuracy per batch</h2>
+    <p class="hint">Vertical markers are injected change points; shaded bands are model versions.</p>
+  </div>
+  <div class="chart-wrap"><canvas id="accuracy-chart"></canvas></div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head"><h2>Class distribution</h2></div>
+    <div class="chart-wrap chart-sm"><canvas id="category-chart"></canvas></div>
+  </section>
+  <section class="card">
+    <div class="card-head">
+      <h2>Latest messages</h2>
+      <p class="hint">Most recent classifications for the active run.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="latest-table">
+        <thead><tr><th>#</th><th>Text</th><th>True</th><th>Predicted</th><th>Conf.</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

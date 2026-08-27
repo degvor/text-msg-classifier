@@ -1,0 +1,2 @@
+chart.js 4.4.7 (sourceMappingURL stripped; .map not vendored)
+42f4dbfe70c430ffc22c7128f36cae8d599cac90b8cd37c8f42a59e565e5deb7  web/dashboard/static/dashboard/vendor/chart.umd.min.js

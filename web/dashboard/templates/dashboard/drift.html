@@ -1,0 +1,37 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Drift · Stream classification{% endblock %}
+{% block heading %}Drift detection{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Detector statistics</h2>
+    <p class="hint">
+      Error-rate detectors need labels; PSI does not. Under concept drift the
+      error rate moves while vocabulary PSI stays flat &mdash; the model is
+      confidently wrong.
+    </p>
+  </div>
+  <div class="chart-wrap"><canvas id="drift-chart"></canvas></div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head"><h2>Events</h2></div>
+    <div class="table-wrap">
+      <table class="table" id="drift-table">
+        <thead><tr><th>Batch</th><th>Detector</th><th>Statistic</th><th>Delay</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>Retraining jobs</h2></div>
+    <div class="table-wrap">
+      <table class="table" id="jobs-table">
+        <thead><tr><th>Job</th><th>Status</th><th>Model</th><th>Trigger</th><th>Finished</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Runs · Stream classification{% endblock %}
+{% block heading %}Experiment runs{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Runs</h2>
+    <p class="hint">
+      The headline comparison is two runs with the same seed differing only in
+      whether adaptation was enabled. <strong>After drift</strong> is the column
+      that matters &mdash; overall accuracy is dominated by the stable prefix
+      both arms share.
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="runs-table">
+      <thead><tr><th>#</th><th>Name</th><th>Seed</th><th>Adapt</th><th>Status</th><th>Batches</th><th>Accuracy</th><th>After drift</th><th>Drift</th><th>Retrains</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

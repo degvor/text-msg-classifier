@@ -1,0 +1,58 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Stream classification{% endblock %}</title>
+  {% comment %}
+    Vendored and pinned. Previously an unpinned CDN <script> with no SRI, on a
+    page that also inlined every style and every script -- so a strict CSP was
+    impossible. Note {# #} is single-line in Django templates; a multi-line one
+    leaks its tail into the rendered page.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'dashboard/css/app.css' %}">
+  <script defer src="{% static 'dashboard/vendor/chart.umd.min.js' %}"></script>
+  <script defer src="{% static 'dashboard/js/app.js' %}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>Stream classification</span>
+    </div>
+    <nav class="nav">
+      {% for route, label in nav %}
+        <a href="{% url route %}" class="{% if route == active_page %}is-active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="topbar-right">
+      <span id="stream-badge" class="badge badge-muted" data-live="badge">…</span>
+      {% if user.is_staff %}
+        <button type="button" id="stream-toggle" class="btn btn-primary">Toggle stream</button>
+      {% else %}
+        <a class="btn btn-ghost" href="{% url 'admin:login' %}?next={{ request.path }}">Sign in</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% comment %}
+    One CSRF token for the whole page; the fetch helper reads it. The old
+    dashboard rendered a token on exactly one form and sent none of its
+    state-changing requests with one.
+  {% endcomment %}
+  {% csrf_token %}
+
+  <div id="flash" class="flash" hidden></div>
+
+  <main class="page">
+    <h1 class="page-title">{% block heading %}{% endblock %}</h1>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    <span>Polling pauses when this tab is hidden.</span>
+    <span id="poll-state">idle</span>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
