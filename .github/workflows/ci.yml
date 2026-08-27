@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Test-only values. Real deployments supply these; the settings deliberately
+  # have no defaults for either, which is what stops a secret being committed.
+  DJANGO_SECRET_KEY: ci-only-not-a-secret
+  POSTGRES_PASSWORD: ci-password
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv venv --python 3.11 .venv
+      - run: uv pip install --python .venv -e ".[dev,db,producer,web]"
+      - name: ruff
+        run: .venv/bin/ruff check src services web tests
+      - name: missing migrations
+        run: .venv/bin/python manage.py makemigrations --check --dry-run
+        working-directory: web
+
+  unit:
+    # No JVM, no database, no Docker: the drift maths, the perturbation engine,
+    # the schema and the scorer are all pure Python by design, so this is the
+    # fast gate.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv venv --python 3.11 .venv
+      - run: uv pip install --python .venv -e ".[dev,db,producer,web]"
+      - run: .venv/bin/python -m pytest tests/unit -q
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: streamdb
+          POSTGRES_USER: streamuser
+          POSTGRES_PASSWORD: ci-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U streamuser -d streamdb"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv venv --python 3.11 .venv
+      - run: uv pip install --python .venv -e ".[dev,db,producer,web]"
+      - name: schema, registry, web and sink tests
+        # The Kafka-backed producer tests need a broker on localhost:9094, which
+        # this job does not start; they are deselected by name rather than
+        # silently skipped, so a missing broker can never look like a pass.
+        run: |
+          .venv/bin/python -m pytest tests/integration -m integration \
+            --ds=config.settings.dev -q \
+            --ignore=tests/integration/test_producer.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build every image
+        run: |
+          docker build -f docker/spark.Dockerfile   -t streamcls/spark:ci .
+          docker build -f docker/producer.Dockerfile -t streamcls/producer:ci .
+          docker build -f docker/web.Dockerfile      -t streamcls/web:ci .
+      - name: spark image is self-contained
+        # Proves the jars are baked in: no Ivy resolution, no network.
+        run: |
+          docker run --rm --network none \
+            -e POSTGRES_PASSWORD=x -e SPARK_LOCAL_IP=127.0.0.1 \
+            streamcls/spark:ci python3 -c "
+          import glob, os
+          jars = [os.path.basename(j) for j in glob.glob(os.environ['SPARK_HOME'] + '/jars/*.jar')]
+          for want in ('spark-sql-kafka', 'kafka-clients', 'commons-pool2', 'postgresql'):
+              assert any(j.startswith(want) for j in jars), want
+          print('all pinned jars present, offline')
+          "

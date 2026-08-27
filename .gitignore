@@ -4,9 +4,6 @@
 *.swp
 .DS_Store
 
-# --- Agent scratch -----------------------------------------------------------
-CLAUDE.md
-
 # --- Python ------------------------------------------------------------------
 __pycache__/
 *.py[cod]
@@ -42,6 +39,8 @@ web/staticfiles/
 staticfiles/
 DjangoApp/staticfiles/
 
-# Legacy layout, removed during the rework. Kept here so a stale working tree
-# does not re-stage 2600 generated files.
-train_data/tokenized_posts_labeled.csv
+# Legacy layout, removed during the rework.
+train_data/
+DjangoApp/
+app/
+producer/

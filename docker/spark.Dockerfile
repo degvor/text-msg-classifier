@@ -7,8 +7,10 @@
 # Building on python:3.11-slim + `pip install pyspark` rather than adopting
 # another vendor image gives: control of the Python version, no vendored-
 # namespace risk, one image for master/worker/consumer/trainer, and a single
-# place where the Spark version is pinned. The pip wheel ships the complete
-# distribution (pyspark/jars, pyspark/sbin), so a standalone cluster works.
+# place where the Spark version is pinned. The wheel ships bin/ and jars/, so a
+# standalone cluster runs via `spark-class org.apache.spark.deploy.master.Master`
+# -- note it ships only a subset of sbin/, so the start-master.sh / start-worker.sh
+# daemon wrappers are NOT available.
 # Debian release pinned explicitly: `python:3.11-slim` now tracks trixie, which
 # dropped openjdk-17. Spark 3.5.x officially supports Java 8/11/17, so bookworm
 # is the right floor -- and pinning it keeps the build reproducible.

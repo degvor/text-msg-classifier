@@ -1,7 +1,7 @@
 # Development entrypoints. Spark work runs in Docker because there is no local JRE.
 .DEFAULT_GOAL := help
 .PHONY: help env install lint fmt typecheck test test-unit test-integration test-spark \
-        data data-info train build up down logs ps shell-spark clean-pyc
+        data data-info train score compare cluster build up down logs ps shell-spark clean-pyc
 
 VENV    := .venv
 PY      := $(VENV)/bin/python
@@ -30,6 +30,17 @@ data-info: ## Show split sizes, balance and leakage check
 train: ## Train on AG News and register the model (A=algorithm, PROMOTE=1)
 	docker compose --profile manual run --rm trainer \
 	  python3 -m services.trainer.train --algorithm $(or $(A),logreg) $(if $(PROMOTE),--promote,)
+
+score: ## Score finished runs and print the results table
+	$(PY) -m streamcls score
+
+compare: ## A/B two seed-matched runs: make compare BASELINE=1 ADAPTIVE=2
+	$(PY) -m streamcls compare $(BASELINE) $(ADAPTIVE)
+
+cluster: ## Start a real Spark standalone cluster (N=worker count)
+	$(COMPOSE) --profile cluster up -d --scale spark-worker=$(or $(N),2)
+	@echo "Spark master UI: http://localhost:$${SPARK_UI_PORT:-8080}"
+	@echo "Point jobs at it with SPARK_MASTER=spark://spark-master:7077"
 
 lint: ## ruff check
 	$(RUFF) check src services web tests

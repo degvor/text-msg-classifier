@@ -1,6 +1,0 @@
-pyspark==3.4.1
-spark-nlp==4.4.0
-kafka-python==2.0.2
-pandas==2.0.3
-numpy==1.24.3
-python-json-logger==2.0.7

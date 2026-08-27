@@ -1,3 +1,0 @@
-kafka-python==2.0.2
-pandas==2.0.3
-faker==18.9.0
