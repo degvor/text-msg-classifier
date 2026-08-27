@@ -5,7 +5,14 @@ read-modify-written by both the Spark driver and Django with no locking, no
 atomicity and no owner: every ``open(path, "w")`` left a window where a reader
 saw zero bytes, and the dashboard polled into that window every five seconds.
 
-Two conventions matter to code outside Django:
+Three conventions matter to code outside Django:
+
+* every field on a table written by raw SQL that has a Python ``default=`` also
+  needs a database-level ``db_default=``. Django applies ``default=`` in Python,
+  so a psycopg2 INSERT that omits the column hits a NOT NULL violation instead.
+  ``batch_metric``, ``classified_message``, ``drift_event``, ``training_job``,
+  ``model_version`` and ``stream_status`` are all written this way;
+
 
 * every model pins ``Meta.db_table`` from :class:`streamcls.db.tables.Table`,
   because the Spark and psycopg2 paths address these tables by name and must
@@ -194,6 +201,17 @@ class StreamConfig(SingletonModel):
     min_batches_between_retrains = models.IntegerField(default=10, validators=[MinValueValidator(0)])
     max_retrains_per_run = models.IntegerField(default=10, validators=[MinValueValidator(0)])
     retrain_window_rows = models.IntegerField(default=20_000, validators=[MinValueValidator(1)])
+    retrain_min_new_rows = models.IntegerField(
+        default=2_000,
+        validators=[MinValueValidator(0)],
+        db_default=2_000,
+        help_text=(
+            "Defer retraining until this many messages have arrived since the change "
+            "point. Drift is detected within a batch or two, when only a few hundred "
+            "rows of the new concept exist -- retraining on those produces a worse "
+            "model and burns one of the run's retrain budget."
+        ),
+    )
     retrain_base_rows = models.IntegerField(
         default=20_000,
         validators=[MinValueValidator(0)],
@@ -218,8 +236,8 @@ class StreamConfig(SingletonModel):
 class StreamStatus(SingletonModel):
     """The control flag, plus liveness and the desired model version."""
 
-    is_active = models.BooleanField(default=False)
-    producer_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False, db_default=False)
+    producer_active = models.BooleanField(default=False, db_default=False)
 
     active_experiment_run = models.ForeignKey(
         ExperimentRun, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
@@ -236,7 +254,7 @@ class StreamStatus(SingletonModel):
     consumer_heartbeat_at = models.DateTimeField(null=True, blank=True)
     producer_heartbeat_at = models.DateTimeField(null=True, blank=True)
     last_batch_id = models.BigIntegerField(null=True, blank=True)
-    last_error = models.TextField(blank=True, default="")
+    last_error = models.TextField(blank=True, default="", db_default="")
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -263,38 +281,62 @@ class ModelVersion(models.Model):
     """A trained artefact plus everything needed to serve and audit it."""
 
     version = models.CharField(max_length=64, unique=True)
-    status = models.CharField(max_length=16, choices=ModelStatus, default=ModelStatus.TRAINING)
+    status = models.CharField(
+        max_length=16, choices=ModelStatus, default=ModelStatus.TRAINING, db_default="training"
+    )
     artifact_path = models.CharField(max_length=512)
-    algorithm = models.CharField(max_length=64, default="logreg_tfidf")
-    hyperparams = models.JSONField(default=dict, blank=True)
+    algorithm = models.CharField(max_length=64, default="logreg_tfidf", db_default="logreg_tfidf")
+    hyperparams = models.JSONField(
+        default=dict, blank=True, db_default=Value({}, models.JSONField())
+    )
 
     # --- evaluation ----------------------------------------------------------
+    #: Accuracy on the *fixed* held-out test set. Comparable across every run
+    #: and every model in the thesis, which is what makes it the headline
+    #: number -- but see `recent_accuracy` for why it must not gate promotion.
     test_accuracy = models.FloatField(null=True, blank=True)
     test_macro_f1 = models.FloatField(null=True, blank=True)
+    #: Accuracy on recent stream data held out from this model's own training
+    #: window, or null when there was none (the initial offline model).
+    #:
+    #: Promotion is gated on *this*, not on `test_accuracy`. Under concept
+    #: drift the fixed test set still encodes the pre-drift labelling, so a
+    #: correctly adapted model necessarily scores worse on it -- gating on the
+    #: stale set would make adaptation structurally impossible, which is
+    #: exactly what happened the first time this loop ran end to end.
+    recent_accuracy = models.FloatField(null=True, blank=True)
     #: accuracy, per-class P/R/F1, confusion matrix, support.
-    metrics = models.JSONField(default=dict, blank=True)
+    metrics = models.JSONField(
+        default=dict, blank=True, db_default=Value({}, models.JSONField())
+    )
     train_rows = models.IntegerField(null=True, blank=True)
 
     # --- drift reference -----------------------------------------------------
     vocab_size = models.IntegerField(null=True, blank=True)
     #: Indices of the top-N training terms that PSI/JS bins fold down to.
     #: Vocabulary PSI over all ~2000 bins is noise at realistic batch sizes.
-    top_term_indices = models.JSONField(default=list, blank=True)
+    top_term_indices = models.JSONField(
+        default=list, blank=True, db_default=Value([], models.JSONField())
+    )
     #: Normalised reference histogram, computed over the training corpus with
     #: this model's vocabulary. Swaps with the model, because PSI is defined
     #: relative to *this* model's training distribution.
-    reference_histogram = models.JSONField(default=list, blank=True)
+    reference_histogram = models.JSONField(
+        default=list, blank=True, db_default=Value([], models.JSONField())
+    )
     #: The model's own confidence profile on held-out data. Comparing a batch
     #: against a *uniform* reference is meaningless -- a calibrated model
     #: concentrates mass in the top bins, so the PSI is enormous and constant.
     #: Against this, movement means "the model has become less sure than it
     #: normally is", which is a usable label-free drift proxy.
-    confidence_reference = models.JSONField(default=list, blank=True)
+    confidence_reference = models.JSONField(
+        default=list, blank=True, db_default=Value([], models.JSONField())
+    )
 
     created_by_run = models.ForeignKey(
         ExperimentRun, null=True, blank=True, on_delete=models.SET_NULL, related_name="models"
     )
-    git_commit = models.CharField(max_length=40, blank=True, default="")
+    git_commit = models.CharField(max_length=40, blank=True, default="", db_default="")
     trained_at = models.DateTimeField(auto_now_add=True)
     activated_at = models.DateTimeField(null=True, blank=True)
 
@@ -336,13 +378,17 @@ class TrainingJob(models.Model):
     trigger_drift_event = models.ForeignKey(
         "DriftEvent", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
-    status = models.CharField(max_length=16, choices=JobStatus, default=JobStatus.QUEUED)
-    params = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16, choices=JobStatus, default=JobStatus.QUEUED, db_default="queued"
+    )
+    params = models.JSONField(
+        default=dict, blank=True, db_default=Value({}, models.JSONField())
+    )
 
     model_version = models.ForeignKey(
         ModelVersion, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
-    error = models.TextField(blank=True, default="")
+    error = models.TextField(blank=True, default="", db_default="")
 
     requested_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -524,14 +570,14 @@ class DriftEvent(models.Model):
 
     #: True when the signal fired inside the post-start / post-swap grace
     #: window. Recorded rather than dropped, so suppression is auditable.
-    suppressed = models.BooleanField(default=False)
+    suppressed = models.BooleanField(default=False, db_default=False)
 
     #: Nearest preceding injected change point, from the run's drift_schedule.
     #: Detection delay is only computable because the producer ships this.
     ground_truth_drift_index = models.IntegerField(null=True, blank=True)
     detection_delay_batches = models.IntegerField(null=True, blank=True)
 
-    action_taken = models.CharField(max_length=32, blank=True, default="none")
+    action_taken = models.CharField(max_length=32, blank=True, default="none", db_default="none")
     training_job = models.ForeignKey(
         TrainingJob, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )

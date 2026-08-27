@@ -42,6 +42,12 @@ services:
       - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
       - ./services:/app/services:ro
 
+  trainer-worker:
+    volumes:
+      - ./data:/data
+      - ./src/streamcls:/usr/local/lib/python3.11/site-packages/streamcls:ro
+      - ./services:/app/services:ro
+
   trainer:
     volumes:
       - ./data:/data

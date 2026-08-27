@@ -26,9 +26,15 @@ project. What changes, and why each one mattered:
   timestamp the same function overwrote -- measuring the producer's emission
   rate rather than system capacity, which is why status read "slow" forever.
 
-Adaptation is deliberately not wired up here. This phase establishes that
-accuracy tracks the offline score and that the drift statistics move under an
-injected shift; acting on them is Phase 5.
+The adaptation loop closes here: detect -> record a DriftEvent -> enqueue a
+guarded TrainingJob -> reset the detectors. The trainer service does the fitting
+and the promotion; the consumer notices the new ``desired_model_version`` on its
+next control poll and restarts the query against the same checkpoint, so the
+swap is lossless.
+
+A ``PipelineModel`` is bound into the query plan at ``start()``, so an in-place
+swap is not possible. Stop-and-restart is the honest mechanism, and its latency
+is reported as a measurement rather than hidden.
 """
 
 from __future__ import annotations
@@ -42,27 +48,18 @@ from pathlib import Path
 from types import FrameType
 
 from streamcls.config import Settings, get_settings
+from streamcls.corpus.schedule import DriftSchedule
 from streamcls.db.repo import ControlState, ModelRecord, Repository
-from streamcls.drift.distributions import jensen_shannon, population_stability_index
-from streamcls.labels import N_CLASSES
+from streamcls.drift.monitor import DriftMonitor, DriftSignal, MonitorConfig
 from streamcls.logging import configure, get_logger
 from streamcls.schemas import spark_schema
-from streamcls.spark.batch import (
-    CONFIDENCE_BINS,
-    aggregate_batch,
-    pack_correct_bits,
-    score,
-)
+from streamcls.spark.batch import aggregate_batch, pack_correct_bits, score
 from streamcls.spark.session import build_session
 from streamcls.spark.sink import upsert_messages
 
 log = get_logger(__name__)
 
 POLL_SECONDS = 2.0
-#: Vocabulary PSI is accumulated over this many batches before being reported.
-#: A 20 000-term space against a 500-message batch is almost all empty bins, and
-#: PSI over sparse bins is noise rather than signal.
-PSI_WINDOW_BATCHES = 10
 
 
 class Consumer:
@@ -73,7 +70,12 @@ class Consumer:
         self.spark = None
         self._model = None
         self._model_record: ModelRecord | None = None
-        self._feature_window: list[list[float]] = []
+        self._monitor: DriftMonitor | None = None
+        #: A detection that fired before enough of the new concept had arrived.
+        #: Held because ADWIN detects *changes*: once the stream settles at the
+        #: new error rate it is stationary again and will never fire a second
+        #: time, so a deferred drift that is not remembered is lost forever.
+        self._pending_drift: DriftSignal | None = None
         self._failures = 0
 
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -90,7 +92,22 @@ class Consumer:
         started = time.monotonic()
         self._model = PipelineModel.load(record.artifact_path)
         self._model_record = record
-        self._feature_window.clear()
+        config = self.repo.read_config()
+        # A fresh monitor per model: PSI is defined relative to *this* model's
+        # training distribution, so the references swap with the model, and the
+        # detectors start cold behind a grace window rather than carrying the
+        # previous model's error history.
+        self._monitor = DriftMonitor(
+            config=MonitorConfig(
+                adwin_delta=float(config["adwin_delta"]),
+                psi_threshold=float(config["psi_threshold"]),
+                psi_consecutive_batches=int(config["psi_consecutive_batches"]),
+                grace_batches=int(config["grace_batches"]),
+            ),
+            reference_histogram=list(record.reference_histogram or []),
+            confidence_reference=list(record.confidence_reference or []),
+            top_term_indices=list(record.top_term_indices or []),
+        )
         self.repo.set_active_model(record.id)
         log.info(
             "model loaded",
@@ -111,6 +128,11 @@ class Consumer:
         why it takes only plain values.
         """
         dsn = self.settings.postgres.dsn
+        config = self.repo.read_config()
+        run = self.repo.load_run(run_id)
+        schedule = DriftSchedule(events=list(run.drift_schedule))
+        adaptation_on = bool(run.adaptation_enabled) and bool(config.get("adaptation_enabled", True))
+        config = dict(config) | {"_adaptation_on": adaptation_on}
 
         def process(batch_df, batch_id: int) -> None:
             started = time.monotonic()
@@ -132,7 +154,10 @@ class Consumer:
                     scored, dsn=dsn, model_version_id=record.id, batch_id=batch_id
                 )
 
-                stats = self._distribution_stats(aggregate, record)
+                monitor = self._monitor
+                assert monitor is not None
+                result = monitor.observe(aggregate, apply=not replay)
+                stats = result.stats
                 self.repo.write_batch_metric(
                     experiment_run_id=run_id,
                     batch_id=batch_id,
@@ -150,8 +175,13 @@ class Consumer:
                     true_hist=_json(aggregate.true_hist),
                     correct_bits=_binary(pack_correct_bits(aggregate.correct_sequence)),
                     throughput_msgs_s=_throughput(aggregate.n_classified, started),
+                    adwin_estimate=monitor._adwin.estimation,
+                    adwin_width=monitor._adwin.width,
+                    ddm_warning=monitor._ddm.warning_detected,
                     **stats,
                 )
+                if result.signals or self._pending_drift is not None:
+                    self._handle_drift(run_id, batch_id, aggregate, result, schedule, config)
                 self.repo.consumer_heartbeat(last_batch_id=batch_id)
                 log.info(
                     "batch",
@@ -169,47 +199,112 @@ class Consumer:
 
         return process
 
-    def _distribution_stats(self, aggregate, record: ModelRecord) -> dict[str, float | None]:
-        """Label-free drift statistics for this batch.
+    def _handle_drift(self, run_id, batch_id, aggregate, result, schedule, config) -> None:
+        """Record what fired and, if permitted, queue exactly one retrain."""
+        change_point = schedule.preceding_change_point(
+            batch_id * int(config["max_offsets_per_trigger"])
+        )
+        # A drift held over from an earlier batch counts as actionable now.
+        first_actionable = result.actionable[0] if result.actionable else self._pending_drift
+        adaptation_on = config.get("_adaptation_on", False)
+        job_id = None
 
-        Confidence and predicted-class histograms are well populated at any
-        realistic batch size, so those are per-batch signals. Vocabulary PSI is
-        accumulated over a window first, because sparse bins make it noise.
+        # Retraining on the first few hundred rows of a new concept produces a
+        # worse model and spends one of the run's retrain budget, so wait until
+        # enough of the new concept exists to learn from.
+        enough_new_data = True
+        if first_actionable is not None and change_point is not None:
+            required = int(config.get("retrain_min_new_rows", 0))
+            if required:
+                seen = self.repo.messages_since(run_id, change_point)
+                enough_new_data = seen >= required
+
+        if first_actionable is not None and not enough_new_data:
+            if self._pending_drift is None:
+                log.info(
+                    "drift detected; deferring retrain until enough new data",
+                    extra={"batch_id": batch_id, "required": required},
+                )
+            # Held, not dropped. ADWIN detects *changes*: once the stream
+            # settles at the new error rate it is stationary again and will
+            # never fire a second time, so a deferred drift that is forgotten
+            # is lost for the rest of the run.
+            self._pending_drift = first_actionable
+            self._record_events(run_id, batch_id, aggregate, result, change_point, config, None)
+            return
+
+        if first_actionable is not None and adaptation_on:
+            # Guarded inside one transaction: cooldown, no concurrent job, and a
+            # per-run cap. Drift fires on several consecutive batches, so without
+            # these a single change point would queue a dozen training runs.
+            job_id = self.repo.enqueue_training_job(
+                run_id=run_id,
+                drift_event_id=None,
+                params={"trigger": first_actionable.detector, "batch_id": batch_id},
+                min_batches_between=int(config["min_batches_between_retrains"]),
+                current_batch=batch_id,
+                max_per_run=int(config["max_retrains_per_run"]),
+            )
+
+        self._record_events(
+            run_id, batch_id, aggregate, result, change_point, config, job_id,
+            trigger=first_actionable if job_id else None,
+        )
+
+        if job_id:
+            self._pending_drift = None
+            log.warning(
+                "drift detected; retrain queued",
+                extra={
+                    "batch_id": batch_id,
+                    "detector": first_actionable.detector,
+                    "accuracy": round(aggregate.accuracy or 0.0, 4),
+                    "job_id": job_id,
+                },
+            )
+            # Reset, or this same drift fires on every later batch and the
+            # cooldown becomes the only thing preventing a retrain storm.
+            assert self._monitor is not None
+            self._monitor.reset()
+
+    def _record_events(
+        self, run_id, batch_id, aggregate, result, change_point, config, job_id, *, trigger=None
+    ) -> None:
+        """Persist every signal that fired, actionable or not.
+
+        ``trigger`` is the signal that actually caused the retrain. It may not
+        appear in ``result.signals`` at all: a deferred drift fires on one batch
+        and is acted on several batches later, and the link between detection
+        and action has to survive that or the results chapter cannot attribute
+        a retrain to anything.
         """
-        uniform_classes = [1.0 / N_CLASSES] * N_CLASSES
-        stats: dict[str, float | None] = {
-            "psi_confidence": None,
-            "psi_predicted": None,
-            "psi_vocabulary": None,
-            "js_vocabulary": None,
-        }
-
-        confidence_reference = record.confidence_reference or []
-        if any(aggregate.confidence_hist) and len(confidence_reference) == CONFIDENCE_BINS:
-            # Against the model's own held-out confidence profile, so movement
-            # means "less sure than this model normally is" -- a label-free
-            # proxy for real drift. Against a uniform reference it would just
-            # measure how confident the model is in general.
-            stats["psi_confidence"] = population_stability_index(
-                confidence_reference, aggregate.confidence_hist
+        per_batch = int(config["max_offsets_per_trigger"])
+        signals = list(result.signals)
+        if trigger is not None and trigger not in signals:
+            signals.append(trigger)
+        for fired in signals:
+            actionable = trigger is not None and fired is trigger
+            self.repo.record_drift_event(
+                run_id=run_id,
+                batch_id=batch_id,
+                detector=fired.detector,
+                statistic=fired.statistic,
+                threshold=fired.threshold,
+                accuracy_before=aggregate.accuracy,
+                suppressed=fired.suppressed,
+                ground_truth_index=change_point,
+                # Delay in batches against the injected change point. Only
+                # computable because the producer ships the ground truth.
+                detection_delay_batches=(
+                    batch_id - change_point // per_batch if change_point is not None else None
+                ),
+                action_taken=(
+                    "retrain_queued" if (actionable and job_id) else
+                    "suppressed" if fired.suppressed else
+                    "recorded"
+                ),
+                training_job_id=job_id if actionable else None,
             )
-        if any(aggregate.predicted_hist):
-            stats["psi_predicted"] = population_stability_index(
-                uniform_classes, aggregate.predicted_hist
-            )
-
-        reference = record.reference_histogram or []
-        top_terms = record.top_term_indices or []
-        if reference and top_terms and aggregate.feature_sums:
-            self._feature_window.append(aggregate.feature_sums)
-            if len(self._feature_window) > PSI_WINDOW_BATCHES:
-                self._feature_window.pop(0)
-            if len(self._feature_window) == PSI_WINDOW_BATCHES:
-                observed = _fold(self._feature_window, top_terms)
-                if observed is not None:
-                    stats["psi_vocabulary"] = population_stability_index(reference, observed)
-                    stats["js_vocabulary"] = jensen_shannon(reference, observed)
-        return stats
 
     # --- streaming query ------------------------------------------------------
     def _start_query(self, run_id: int, config: dict):
@@ -303,11 +398,19 @@ class Consumer:
                         continue
                     if self._model_record is None or self._model_record.id != desired.id:
                         self._load_model(desired)
-                    query = self._start_query(
-                        control.active_experiment_run_id, self.repo.read_config()
-                    )
+                    run_id = control.active_experiment_run_id
+                    # Replay, never unpickle: detector internals are not a
+                    # version-stable contract, and correct_bits makes this exact.
+                    history = self.repo.batch_metrics_since(run_id)
+                    if history and self._monitor is not None:
+                        self._monitor.rebuild(history)
+                        log.info(
+                            "detector state rebuilt by replay",
+                            extra={"batches": len(history)},
+                        )
+                    query = self._start_query(run_id, self.repo.read_config())
                     self._failures = 0
-                    log.info("query started", extra={"run_id": control.active_experiment_run_id})
+                    log.info("query started", extra={"run_id": run_id})
                     continue
 
                 if query is not None:
@@ -384,27 +487,6 @@ def _binary(value: bytes):
     import psycopg2
 
     return psycopg2.Binary(value)
-
-
-def _fold(window: list[list[float]], top_terms: list[int]) -> list[float] | None:
-    """Sum a window of feature vectors and fold to top terms plus 'other'."""
-    import numpy as np
-
-    stacked = np.sum(np.asarray(window, dtype=float), axis=0)
-    total = float(stacked.sum())
-    if total <= 0:
-        return None
-    indices = [i for i in top_terms if i < stacked.size]
-    if len(indices) != len(top_terms):
-        # A reference built against a different vocabulary is a bug, not
-        # something to silently truncate: the bins would not line up.
-        log.error(
-            "reference vocabulary does not match the model",
-            extra={"reference_terms": len(top_terms), "vocab": int(stacked.size)},
-        )
-        return None
-    selected = stacked[indices]
-    return [*selected.tolist(), max(0.0, total - float(selected.sum()))]
 
 
 def main() -> int:

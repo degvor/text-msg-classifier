@@ -67,6 +67,9 @@ class TrainResult:
     hyperparams: dict
     val: Evaluation
     test: Evaluation
+    #: Evaluation on recent stream data held out from the training window.
+    #: None for an offline model with no stream history.
+    recent: Evaluation | None
     train_rows: int
     vocab_size: int
     top_term_indices: list[int]
@@ -129,8 +132,28 @@ def train(
     seed: int = 20260827,
     version: str | None = None,
     sample: int | None = None,
+    documents: list | None = None,
+    holdout: list | None = None,
+    spark: object | None = None,
     **params,
 ) -> TrainResult:
+    """Fit, evaluate, save and verify a model.
+
+    ``documents`` overrides the training split, which is how the adaptive
+    retrain supplies a base sample plus a window of recent stream data.
+    Validation and test always come from the fixed splits, so an adapted model
+    is scored on the same held-out data as the original -- otherwise the
+    promotion guard would be comparing two different yardsticks.
+
+    ``holdout`` is recent stream data kept out of ``documents``. It is what
+    the promotion guard compares on: under concept drift the fixed test set
+    still encodes the pre-drift labelling, so a correctly adapted model scores
+    worse on it and would be rejected every time.
+
+    ``spark`` lets a caller supply a session to reuse. The trainer worker does,
+    because paying session startup on every retrain would inflate the
+    adaptation-latency measurement.
+    """
     started = time.monotonic()
     corpus_dir = Path(settings.paths.corpus_dir) / "agnews"
 
@@ -144,23 +167,36 @@ def train(
         },
     )
 
-    train_docs = splits.train[:sample] if sample else splits.train
+    if documents is not None:
+        train_docs = documents
+    elif sample:
+        train_docs = splits.train[:sample]
+    else:
+        train_docs = splits.train
     val_docs = splits.val[: sample // 4] if sample else splits.val
     test_docs = splits.test[: sample // 4] if sample else splits.test
 
-    spark = build_session(f"train-{algorithm}", settings=settings.spark)
+    owns_session = spark is None
+    spark = spark or build_session(f"train-{algorithm}", settings=settings.spark)
     try:
         # Only the full splits are cacheable; a --sample run is a smoke test
         # and must not poison the cache with a truncated split.
-        cache_root = Path(settings.paths.corpus_dir) / "splits" / str(seed) if not sample else None
+        cache_root = (
+            Path(settings.paths.corpus_dir) / "splits" / str(seed)
+            if not sample and documents is None
+            else None
+        )
+        # A retrain's corpus is run-specific and changes every time, so it is
+        # never cached -- only the fixed splits are.
         train_df = _to_dataframe(
             spark, train_docs, cache_path=cache_root / "train" if cache_root else None
         ).cache()
+        fixed_cache = Path(settings.paths.corpus_dir) / "splits" / str(seed) if not sample else None
         val_df = _to_dataframe(
-            spark, val_docs, cache_path=cache_root / "val" if cache_root else None
+            spark, val_docs, cache_path=fixed_cache / "val" if fixed_cache else None
         ).cache()
         test_df = _to_dataframe(
-            spark, test_docs, cache_path=cache_root / "test" if cache_root else None
+            spark, test_docs, cache_path=fixed_cache / "test" if fixed_cache else None
         ).cache()
         train_rows = train_df.count()
         log.info(
@@ -186,6 +222,15 @@ def train(
         featurised = model.transform(train_df)
         top_terms, histogram, vocab_size = build_reference(featurised)
 
+        recent_eval = None
+        if holdout:
+            recent_df = _to_dataframe(spark, holdout)
+            recent_eval = evaluate_predictions(model.transform(recent_df))
+            log.info(
+                "recent-data evaluation",
+                extra={"rows": len(holdout), "accuracy": recent_eval.accuracy},
+            )
+
         version = version or f"{algorithm}-{time.strftime('%Y%m%d-%H%M%S')}"
         artifact_path = Path(settings.paths.model_root) / version
         if artifact_path.exists():
@@ -202,6 +247,7 @@ def train(
             hyperparams=dict(params) | {"seed": seed},
             val=val_eval,
             test=test_eval,
+            recent=recent_eval,
             train_rows=train_rows,
             vocab_size=vocab_size,
             top_term_indices=top_terms,
@@ -210,7 +256,8 @@ def train(
             seconds=time.monotonic() - started,
         )
     finally:
-        spark.stop()
+        if owns_session:
+            spark.stop()
 
 
 def _verify_reloadable(spark, artifact_path: Path, sample_df) -> None:
@@ -231,7 +278,15 @@ def _verify_reloadable(spark, artifact_path: Path, sample_df) -> None:
     log.info("artifact verified reloadable", extra={"path": str(artifact_path)})
 
 
-def register(result: TrainResult, settings: Settings, *, promote: bool, min_delta: float) -> int:
+def register(
+    result: TrainResult,
+    settings: Settings,
+    *,
+    promote: bool,
+    min_delta: float,
+    run_id: int | None = None,
+    since_batch: int | None = None,
+) -> int:
     with Repository(settings.postgres) as repo:
         model_id = repo.register_model(
             version=result.version,
@@ -241,10 +296,12 @@ def register(result: TrainResult, settings: Settings, *, promote: bool, min_delt
             metrics={
                 "val": result.val.as_dict(),
                 "test": result.test.as_dict(),
+                "recent": result.recent.as_dict() if result.recent else None,
                 "train_seconds": round(result.seconds, 2),
             },
             test_accuracy=result.test.accuracy,
             test_macro_f1=result.test.macro_f1,
+            recent_accuracy=result.recent.accuracy if result.recent else None,
             train_rows=result.train_rows,
             vocab_size=result.vocab_size,
             top_term_indices=result.top_term_indices,
@@ -255,7 +312,9 @@ def register(result: TrainResult, settings: Settings, *, promote: bool, min_delt
         log.info("registered", extra={"model_id": model_id, "version": result.version})
 
         if promote:
-            if repo.promote_model(model_id, min_delta=min_delta):
+            if repo.promote_model(
+                model_id, min_delta=min_delta, run_id=run_id, since_batch=since_batch
+            ):
                 log.info("promoted to active", extra={"model_id": model_id})
             else:
                 log.warning(
@@ -298,6 +357,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n=== {result.version} ({result.algorithm}) in {result.seconds:.1f}s ===")  # noqa: T201
     print(f"\nVALIDATION\n{result.val.summary()}")  # noqa: T201
     print(f"\nTEST\n{result.test.summary()}")  # noqa: T201
+    if result.recent:
+        print(f"\nRECENT STREAM DATA (promotion basis)\n{result.recent.summary()}")  # noqa: T201
     print(  # noqa: T201
         f"\nvocab={result.vocab_size}  reference bins={len(result.reference_histogram)}"
         f"  artifact={result.artifact_path}"

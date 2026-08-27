@@ -40,7 +40,7 @@ def repo():
         yield repository
 
 
-def _register(repo, version: str, accuracy: float) -> int:
+def _register(repo, version: str, accuracy: float, recent: float | None = None) -> int:
     return repo.register_model(
         version=version,
         artifact_path=f"/data/models/{version}",
@@ -54,6 +54,7 @@ def _register(repo, version: str, accuracy: float) -> int:
         top_term_indices=[1, 2, 3],
         reference_histogram=[0.5, 0.3, 0.2],
         confidence_reference=[0.1] * 10,
+        recent_accuracy=recent,
     )
 
 
@@ -160,3 +161,55 @@ def test_transaction_helper_rolls_back(repo):
         raise RuntimeError("boom")
     assert ModelVersion.objects.count() == before
     assert ModelVersion.objects.get(version="v1").status == ModelStatus.READY
+
+
+def test_promotion_compares_recent_scores_when_both_have_them(repo):
+    """Under concept drift the fixed test set still encodes the old labelling,
+    so a correctly adapted model scores worse on it. Comparing on it would
+    reject every adaptation and make the loop structurally useless."""
+    old = _register(repo, "v1", accuracy=0.90, recent=0.55)
+    repo.promote_model(old)
+    # Worse on the stale test set, much better on current data.
+    new = _register(repo, "v2", accuracy=0.72, recent=0.87)
+
+    assert repo.promote_model(new, min_delta=0.01) is True
+    assert ModelVersion.objects.get(pk=new).status == ModelStatus.ACTIVE
+
+
+def test_promotion_falls_back_to_measured_live_accuracy(repo):
+    """The usual case: the incumbent was trained offline and has no recent
+    score, so its measured live accuracy over recent batches stands in."""
+    from datetime import UTC, datetime
+
+    from dashboard.models import BatchMetric, ExperimentRun
+
+    old = _register(repo, "v1", accuracy=0.91)
+    repo.promote_model(old)
+    run = ExperimentRun.objects.create(name="r", seed=1, total_messages=10)
+    for batch_id in range(3):
+        BatchMetric.objects.create(
+            experiment_run=run, batch_id=batch_id, model_version_id=old,
+            started_at=datetime.now(UTC), n_received=500, n_classified=500, n_correct=250,
+        )
+    assert repo.live_accuracy() == pytest.approx(0.5)
+
+    new = _register(repo, "v2", accuracy=0.70, recent=0.80)
+    assert repo.promote_model(new, min_delta=0.01) is True
+
+
+def test_live_accuracy_can_be_scoped_to_the_current_concept(repo):
+    """Drift is detected within a batch or two, so an unscoped window is mostly
+    pre-drift data and reports the incumbent as far healthier than it is."""
+    from datetime import UTC, datetime
+
+    from dashboard.models import BatchMetric, ExperimentRun
+
+    model_id = _register(repo, "v1", accuracy=0.9)
+    run = ExperimentRun.objects.create(name="r", seed=1, total_messages=10)
+    for batch_id, correct in enumerate([450, 450, 450, 250, 250]):
+        BatchMetric.objects.create(
+            experiment_run=run, batch_id=batch_id, model_version_id=model_id,
+            started_at=datetime.now(UTC), n_received=500, n_classified=500, n_correct=correct,
+        )
+    assert repo.live_accuracy(run_id=run.pk) == pytest.approx((450 * 3 + 250 * 2) / 2500)
+    assert repo.live_accuracy(run_id=run.pk, since_batch=3) == pytest.approx(0.5)

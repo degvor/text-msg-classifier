@@ -135,6 +135,30 @@ services:
     # unhandled exception was a permanent outage.
     restart: unless-stopped
 
+  # The adaptation loop's other half: claims drift-triggered retrain jobs.
+  # Separate from the consumer on purpose -- forking a second Spark JVM inside a
+  # container already running a streaming query would contend for the memory and
+  # cores whose throughput is being measured.
+  trainer-worker:
+    build:
+      context: .
+      dockerfile: docker/trainer.Dockerfile
+    command: ["python3", "-m", "services.trainer.worker"]
+    environment:
+      <<: *postgres-env
+      STREAMCLS_DATA_ROOT: /data
+      SPARK_LOCAL_IP: 127.0.0.1
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-3g}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Behind a profile: training is an explicit action, not something that runs
   # on `up`. Shares the Spark base image with the consumer, so Spark and jar
   # versions are pinned in exactly one place.

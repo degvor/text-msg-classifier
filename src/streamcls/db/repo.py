@@ -57,6 +57,7 @@ class ModelRecord:
     artifact_path: str
     algorithm: str
     test_accuracy: float | None
+    recent_accuracy: float | None
     vocab_size: int | None
     top_term_indices: list[int]
     reference_histogram: list[float]
@@ -237,6 +238,7 @@ class Repository:
         metrics: dict[str, Any],
         test_accuracy: float,
         test_macro_f1: float,
+        recent_accuracy: float | None,
         train_rows: int,
         vocab_size: int,
         top_term_indices: list[int],
@@ -256,15 +258,15 @@ class Repository:
                 f"""
                 INSERT INTO {Table.MODEL_VERSION}
                     (version, status, artifact_path, algorithm, hyperparams,
-                     test_accuracy, test_macro_f1, metrics, train_rows,
+                     test_accuracy, test_macro_f1, recent_accuracy, metrics, train_rows,
                      vocab_size, top_term_indices, reference_histogram,
                      confidence_reference, created_by_run_id, git_commit, trained_at)
-                VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 RETURNING id
                 """,
                 (
                     version, artifact_path, algorithm, Json(hyperparams),
-                    test_accuracy, test_macro_f1, Json(metrics), train_rows,
+                    test_accuracy, test_macro_f1, recent_accuracy, Json(metrics), train_rows,
                     vocab_size, Json(top_term_indices), Json(reference_histogram),
                     Json(confidence_reference), created_by_run, git_commit,
                 ),
@@ -276,7 +278,8 @@ class Repository:
             cur.execute(
                 f"""
                 SELECT id, version, status, artifact_path, algorithm, test_accuracy,
-                       vocab_size, top_term_indices, reference_histogram, confidence_reference
+                       recent_accuracy, vocab_size, top_term_indices,
+                       reference_histogram, confidence_reference
                 FROM {Table.MODEL_VERSION} WHERE id = %s
                 """,
                 (model_id,),
@@ -291,21 +294,77 @@ class Repository:
             cur.execute(
                 f"""
                 SELECT id, version, status, artifact_path, algorithm, test_accuracy,
-                       vocab_size, top_term_indices, reference_histogram, confidence_reference
+                       recent_accuracy, vocab_size, top_term_indices,
+                       reference_histogram, confidence_reference
                 FROM {Table.MODEL_VERSION} WHERE status = 'active'
                 """
             )
             row = cur.fetchone()
         return ModelRecord(**row) if row else None
 
-    def promote_model(self, model_id: int, *, min_delta: float = 0.0) -> bool:
+    def live_accuracy(
+        self, *, run_id: int | None = None, since_batch: int | None = None, batches: int = 5
+    ) -> float | None:
+        """The active model's measured accuracy on data from the current concept.
+
+        Already computed every micro-batch, so the promotion guard can compare
+        like with like for free rather than reloading the old model to re-score
+        it on the candidate's holdout.
+
+        ``since_batch`` matters more than it looks. Drift is detected within a
+        batch or two of the change point, so a plain "last N batches" window
+        still contains mostly *pre-drift* data and reports the incumbent as far
+        healthier than it currently is -- which rejects every adapted model and
+        silently makes adaptation impossible. Scoping to batches at or after the
+        detection point measures the incumbent under the concept the candidate
+        was trained for.
+        """
+        clauses, params = [], []
+        if run_id is not None:
+            clauses.append("experiment_run_id = %s")
+            params.append(run_id)
+        if since_batch is not None:
+            clauses.append("batch_id >= %s")
+            params.append(since_batch)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(batches)
+
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT sum(n_correct)::float / NULLIF(sum(n_classified), 0) AS accuracy
+                FROM (
+                    SELECT n_correct, n_classified FROM {Table.BATCH_METRIC}
+                    {where}
+                    ORDER BY experiment_run_id DESC, batch_id DESC LIMIT %s
+                ) recent
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+        return float(row["accuracy"]) if row and row["accuracy"] is not None else None
+
+    def promote_model(
+        self,
+        model_id: int,
+        *,
+        min_delta: float = 0.0,
+        run_id: int | None = None,
+        since_batch: int | None = None,
+    ) -> bool:
         """Make ``model_id`` the active version, if it is not clearly worse.
 
         The guard exists because without it a retrain on an unlucky window
         makes the system worse and it oscillates -- which would show up in the
-        thesis as adaptation actively hurting. With it, adaptation is monotone
-        by construction, and a rejected promotion is itself evidence the guard
-        works.
+        thesis as adaptation actively hurting.
+
+        **What it compares matters more than the threshold.** It scores both
+        models on ``recent_accuracy`` -- performance on recent stream data --
+        falling back to ``test_accuracy`` only when the candidate has no recent
+        score. Comparing on the fixed test set would be wrong under concept
+        drift: that set still encodes the pre-drift labelling, so a correctly
+        adapted model scores *worse* on it and would be rejected every time,
+        making adaptation structurally impossible.
 
         Retire-then-activate happens in one transaction because
         ``only_one_active_model_version`` is a real constraint.
@@ -314,7 +373,10 @@ class Repository:
             # FOR UPDATE: two concurrent promotions must not both pass the
             # guard and then collide on the single-active constraint.
             cur.execute(
-                f"SELECT id, test_accuracy FROM {Table.MODEL_VERSION} WHERE id = %s FOR UPDATE",
+                f"""
+                SELECT id, test_accuracy, recent_accuracy FROM {Table.MODEL_VERSION}
+                WHERE id = %s FOR UPDATE
+                """,
                 (model_id,),
             )
             candidate = cur.fetchone()
@@ -323,15 +385,16 @@ class Repository:
 
             cur.execute(
                 f"""
-                SELECT id, test_accuracy FROM {Table.MODEL_VERSION}
+                SELECT id, test_accuracy, recent_accuracy FROM {Table.MODEL_VERSION}
                 WHERE status = 'active' FOR UPDATE
                 """
             )
             incumbent = cur.fetchone()
 
             if incumbent is not None and incumbent["id"] != model_id:
-                new_score = candidate["test_accuracy"] or 0.0
-                old_score = incumbent["test_accuracy"] or 0.0
+                new_score, old_score = self._comparable_scores(
+                    candidate, incumbent, run_id=run_id, since_batch=since_batch
+                )
                 if new_score < old_score - min_delta:
                     return False
                 cur.execute(
@@ -411,6 +474,159 @@ class Repository:
             )
             return [dict(row) for row in cur.fetchall()]
 
+    def record_drift_event(
+        self,
+        *,
+        run_id: int,
+        batch_id: int,
+        detector: str,
+        statistic: float | None,
+        threshold: float | None,
+        accuracy_before: float | None,
+        suppressed: bool,
+        ground_truth_index: int | None,
+        detection_delay_batches: int | None,
+        action_taken: str,
+        training_job_id: int | None = None,
+    ) -> int:
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {Table.DRIFT_EVENT}
+                    (experiment_run_id, batch_id, detector, statistic, threshold,
+                     accuracy_before, suppressed, ground_truth_drift_index,
+                     detection_delay_batches, action_taken, training_job_id, detected_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                RETURNING id
+                """,
+                (run_id, batch_id, detector, statistic, threshold, accuracy_before,
+                 suppressed, ground_truth_index, detection_delay_batches,
+                 action_taken, training_job_id),
+            )
+            return int(cur.fetchone()["id"])
+
+    # --- training job queue ---------------------------------------------------
+    def enqueue_training_job(
+        self,
+        *,
+        run_id: int,
+        drift_event_id: int | None,
+        params: dict[str, Any],
+        min_batches_between: int,
+        current_batch: int,
+        max_per_run: int,
+    ) -> int | None:
+        """Queue a retrain, unless a guard says no. Returns the job id or None.
+
+        Drift typically fires on several consecutive batches, so without these
+        guards a single change point would queue dozens of training runs. The
+        checks are done in one transaction with the insert so two batches
+        cannot both pass them.
+        """
+        with self.transaction() as cur:
+            cur.execute(
+                f"""
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE status IN ('queued','running')) AS active
+                FROM {Table.TRAINING_JOB} WHERE experiment_run_id = %s
+                """,
+                (run_id,),
+            )
+            counts = cur.fetchone()
+            if counts["active"]:
+                return None
+            if counts["total"] >= max_per_run:
+                return None
+
+            # Cooldown measured against the last batch that produced a job.
+            cur.execute(
+                f"""
+                SELECT max(d.batch_id) AS last_batch
+                FROM {Table.TRAINING_JOB} j
+                JOIN {Table.DRIFT_EVENT} d ON d.id = j.trigger_drift_event_id
+                WHERE j.experiment_run_id = %s
+                """,
+                (run_id,),
+            )
+            last = cur.fetchone()["last_batch"]
+            if last is not None and current_batch - last < min_batches_between:
+                return None
+
+            cur.execute(
+                f"""
+                INSERT INTO {Table.TRAINING_JOB}
+                    (experiment_run_id, trigger_drift_event_id, status, params, requested_at)
+                VALUES (%s, %s, 'queued', %s, now())
+                RETURNING id
+                """,
+                (run_id, drift_event_id, Json(params)),
+            )
+            return int(cur.fetchone()["id"])
+
+    def claim_training_job(self) -> dict[str, Any] | None:
+        """Atomically take the oldest queued job.
+
+        ``FOR UPDATE SKIP LOCKED`` is the right primitive: it never loses a job,
+        never hands the same one to two workers, and scales to several trainer
+        replicas without changing anything.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.TRAINING_JOB} SET status = 'running', started_at = now()
+                WHERE id = (
+                    SELECT id FROM {Table.TRAINING_JOB}
+                    WHERE status = 'queued' ORDER BY id LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                )
+                RETURNING id, experiment_run_id, params, trigger_drift_event_id
+                """
+            )
+            row = cur.fetchone()
+        return dict(row) if row else None
+
+    def finish_training_job(
+        self,
+        job_id: int,
+        status: str,
+        *,
+        model_version_id: int | None = None,
+        error: str = "",
+    ) -> None:
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.TRAINING_JOB}
+                SET status = %s, finished_at = now(), model_version_id = %s, error = %s
+                WHERE id = %s
+                """,
+                (status, model_version_id, error[:4000], job_id),
+            )
+
+    def messages_since(self, run_id: int, msg_index: int) -> int:
+        """How many messages of the current concept have arrived so far."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT count(*) AS n FROM {Table.CLASSIFIED_MESSAGE}
+                WHERE experiment_run_id = %s AND msg_index >= %s
+                """,
+                (run_id, msg_index),
+            )
+            return int(cur.fetchone()["n"])
+
+    def recent_labelled_messages(self, run_id: int, limit: int) -> list[tuple[str, int]]:
+        """The sliding window of stream data a retrain learns the new concept from."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT post_text, true_label_id FROM {Table.CLASSIFIED_MESSAGE}
+                WHERE experiment_run_id = %s ORDER BY msg_index DESC LIMIT %s
+                """,
+                (run_id, limit),
+            )
+            return [(r["post_text"], r["true_label_id"]) for r in cur.fetchall()]
+
     def record_stream_error(self, message: str) -> None:
         with self.cursor() as cur:
             cur.execute(
@@ -431,6 +647,41 @@ class Repository:
                 f"UPDATE {Table.STREAM_STATUS} SET is_active = %s WHERE id = 1",
                 (active,),
             )
+
+    def _comparable_scores(
+        self,
+        candidate: dict,
+        incumbent: dict,
+        *,
+        run_id: int | None = None,
+        since_batch: int | None = None,
+    ) -> tuple[float, float]:
+        """Score both models on the same kind of data.
+
+        Order of preference:
+
+        1. both have a recent-data score -- use those;
+        2. the candidate has one and the incumbent does not (the usual case:
+           the incumbent was trained offline before the stream existed) -- use
+           the incumbent's *measured live accuracy* over the last few batches,
+           which is its performance on exactly the same distribution;
+        3. neither -- fall back to the fixed test set.
+
+        Never mix: comparing a candidate's recent-data score against an
+        incumbent's fixed-test score rejects every adapted model, because under
+        concept drift the fixed set still encodes the old labelling.
+        """
+        if candidate["recent_accuracy"] is None:
+            return (candidate["test_accuracy"] or 0.0, incumbent["test_accuracy"] or 0.0)
+
+        new_score = candidate["recent_accuracy"]
+        if incumbent["recent_accuracy"] is not None:
+            return (new_score, incumbent["recent_accuracy"])
+
+        measured = self.live_accuracy(run_id=run_id, since_batch=since_batch)
+        if measured is not None:
+            return (new_score, measured)
+        return (new_score, incumbent["test_accuracy"] or 0.0)
 
     def set_producer_active(self, active: bool) -> None:
         with self.cursor() as cur:

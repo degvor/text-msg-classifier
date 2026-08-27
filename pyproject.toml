@@ -54,6 +54,10 @@ dev = [
     "pytest>=8.3,<9",
     "pytest-cov>=6.0,<8",
     "pytest-django>=4.9,<5",
+    # Reference implementations, used ONLY to validate ours in the test suite.
+    # Never a runtime dependency: it pins >=3.11, and the algorithms are the
+    # subject of the thesis rather than something to outsource.
+    "river>=0.21",
     "ruff>=0.8,<1",
     "mypy>=1.13,<2",
 ]
