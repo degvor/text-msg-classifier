@@ -30,6 +30,13 @@ Why the lifecycle is ordered the way it is (each step closes a race):
    classified and no retrain is queued or running, on two consecutive polls
    (a retrain may be enqueued just after the last batch's metric row);
 7. stop the consumer, wait for the query to release, score, append.
+
+When the loop ends -- finished, failed or Ctrl-C -- the base model is made
+active again. ``base_model = "active"`` is resolved afresh by every
+invocation, so a matrix that left a retrained model active would hand it to
+the next matrix, or to its own resume, as the base. A crash gets no such
+cleanup, so a resume also refuses a ledger whose completed cells ran on a
+different base.
 """
 
 from __future__ import annotations
@@ -619,6 +626,7 @@ class MatrixRunner:
         """Run every cell not already completed in ``ledger``. Returns a
         process exit code: 0 all completed, 1 some did not, 130 interrupted."""
         base_id = self.preflight(spec, cells)
+        self._check_ledger_base(ledger, base_id)
         done = completed_keys(ledger)
         failures = 0
         consecutive = 0
@@ -655,7 +663,37 @@ class MatrixRunner:
         finally:
             with _cleanup("stopping the stream"):
                 self._quiet()
+            self._restore_base(base_id)
         return 1 if failures else 0
+
+    def _check_ledger_base(self, ledger: Path, base_id: int) -> None:
+        bases = {
+            r["base_model_version_id"]
+            for r in read_ledger(ledger)
+            if r.get("status") == "completed" and r.get("base_model_version_id") is not None
+        }
+        if bases and bases != {base_id}:
+            hint = f"; resume with --base-model {next(iter(bases))}" if len(bases) == 1 else ""
+            raise RunnerError(
+                f"{ledger}: completed cells ran on base model "
+                f"{', '.join(map(str, sorted(bases)))}, this run would start from {base_id}{hint}"
+            )
+
+    def _restore_base(self, base_id: int) -> None:
+        """Leave the registry as the matrix found it. Not ``_cleanup``: a
+        second Ctrl-C here must not turn exit code 130 into a traceback."""
+        try:
+            self._wait_for_release()
+            self._repo.promote_model(base_id, force=True)
+            return
+        except KeyboardInterrupt:
+            reason = "interrupted"
+        except Exception as error:
+            reason = f"{type(error).__name__}: {error}"
+        log.warning(
+            "base model %d was not made active again (%s); resume with --base-model %d",
+            base_id, reason, base_id,
+        )
 
     # --- one cell -----------------------------------------------------------
     def run_cell(self, cell: Cell, *, base_model_id: int) -> dict[str, Any]:

@@ -153,6 +153,12 @@ Things to know while it runs:
   cell and exits 130) is resumed by running the same command again. To redo a
   cell, delete its line or pass `ARGS="--only 'concept_abrupt/*'"`. `make report`
   takes the last line per cell.
+- **The base model is restored on exit.** Adaptive cells promote retrained
+  models; when the loop ends, finished, failed or interrupted, the runner
+  re-activates the base, so the next `base_model = "active"` resolves to the
+  same model. A crash gets no cleanup, so a resume refuses a ledger whose
+  completed cells ran on a different base and tells you which
+  `ARGS="--base-model <id>"` to pass.
 - **The runner owns the stream flags.** Do not toggle the producer or consumer
   from the dashboard during a matrix; a dropped consumer flag is exactly what
   the consumer's own surrender looks like, so the cell is recorded as failed.

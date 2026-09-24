@@ -9,6 +9,7 @@ just on the final result.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -410,7 +411,8 @@ class FakeWorld:
         self._job_countdown: int | None = None
         self.jobs_finished = 0
         self.query_started_with_model: list[int | None] = []
-        self.interrupt_at_tick: int | None = None
+        #: Ticks on which Ctrl-C is pressed, once each.
+        self.interrupt_at_ticks: set[int] = set()
         self.topics: list[str] = []
         self.scored: list[tuple[int, int]] = []
 
@@ -543,7 +545,7 @@ class FakeWorld:
     # --- the world ---------------------------------------------------------
     def tick(self) -> None:
         self.ticks += 1
-        if self.interrupt_at_tick is not None and self.ticks >= self.interrupt_at_tick:
+        if self.ticks in self.interrupt_at_ticks:
             raise KeyboardInterrupt
         c = self.control
         run = self.runs.get(c["active_experiment_run_id"])
@@ -619,6 +621,20 @@ def two_cells(**overrides: Any) -> tuple[Any, list[Cell]]:
     return spec, expand(spec)
 
 
+def retrain_promotes_during(world: FakeWorld, run_id: int) -> None:
+    """Have the trainer promote model 2 halfway through ``run_id``, as an
+    adaptive run's retrain does."""
+    original_tick = world.tick
+
+    def tick() -> None:
+        original_tick()
+        run = world.runs.get(world.control["active_experiment_run_id"])
+        if run and run.id == run_id and run.classified >= 1000 and world.active_model == 1:
+            world.promote_model(2)
+
+    world.tick = tick  # type: ignore[method-assign]
+
+
 # ---------------------------------------------------------------------------
 # The lifecycle
 # ---------------------------------------------------------------------------
@@ -642,6 +658,7 @@ def test_a_cell_runs_the_lifecycle_in_order(tmp_path):
         "set_stream_active",      # 7. consumer off
         "score",                  #    then score
         "set_stream_active",      # matrix over: leave both flags off
+        "promote_model",          #    and the base model active
     ]
     rows = read_ledger(tmp_path / "runs.jsonl")
     assert len(rows) == 1 and rows[0]["status"] == "completed"
@@ -690,23 +707,27 @@ def test_the_base_model_is_reset_only_once_the_query_is_released(tmp_path):
 def test_every_cell_starts_from_the_base_model_even_after_a_retrain(tmp_path):
     world = FakeWorld()
     spec, cells = two_cells()
-    # Simulate the trainer promoting a retrained model during cell 1 by
-    # letting the world's active model drift between cells.
-    original_tick = world.tick
-
-    def tick_with_promotion() -> None:
-        original_tick()
-        run = world.runs.get(world.control["active_experiment_run_id"])
-        if run and run.id == 1 and run.classified >= 1000 and world.active_model == 1:
-            world.promote_model(2)
-
-    world.tick = tick_with_promotion  # type: ignore[method-assign]
+    retrain_promotes_during(world, run_id=1)
     runner(world).run(spec, cells, ledger=tmp_path / "runs.jsonl")
 
     resets = [arg for name, arg, _ in world.calls if name == "promote_model" and arg[1]]
-    assert resets == [(1, True), (1, True)]
+    assert resets == [(1, True), (1, True), (1, True)], "one per cell, one on the way out"
     assert world.query_started_with_model == [1, 1]
     assert world.runs[2].fields["base_model_version_id"] == 1
+
+
+def test_the_matrix_leaves_the_base_model_active_after_a_retrain(tmp_path):
+    """``base_model = "active"`` is resolved afresh by every invocation, so a
+    matrix that ends on a retrained model would hand it to the next one as
+    its base."""
+    world = FakeWorld()
+    spec, cells = two_cells()
+    retrain_promotes_during(world, run_id=2)
+    code = runner(world).run(spec, cells, ledger=tmp_path / "runs.jsonl")
+
+    assert code == 0
+    assert world.active_model == 1
+    assert world.models[1].status == "active" and world.models[2].status == "retired"
 
 
 def test_completion_waits_for_a_retrain_enqueued_after_the_last_batch(tmp_path):
@@ -865,6 +886,31 @@ def test_a_run_from_another_matrix_with_the_same_name_is_not_adopted(tmp_path):
     assert [arg for name, arg, _ in world.calls if name == "create_run"] == [6]
 
 
+def test_a_resume_against_a_different_base_model_is_refused(tmp_path):
+    """A crash leaves a retrained model active with no ``finally`` to undo
+    it. Resuming on it would mix two base models in one ledger."""
+    world = FakeWorld()
+    world.promote_model(2)
+    world.calls.clear()
+    spec, cells = two_cells()
+    ledger = tmp_path / "runs.jsonl"
+    t0 = datetime(2026, 8, 30, tzinfo=UTC)
+    append_row(
+        ledger,
+        result_row(cells[0], status="completed", run_id=41, base_model_version_id=1,
+                   started_at=t0, ended_at=t0, score=FakeScore(41, 500)),
+    )
+    with pytest.raises(RunnerError, match="--base-model 1"):
+        runner(world).run(spec, cells, ledger=ledger)
+    assert world.calls == []
+    assert len(read_ledger(ledger)) == 1
+
+    pinned = parse_spec(small_spec(defaults={"base_model": 1}))
+    assert runner(world).run(pinned, expand(pinned), ledger=ledger) == 0
+    assert [r.name for r in world.runs.values()] == [cells[1].run_name]
+    assert world.runs[1].fields["base_model_version_id"] == 1
+
+
 # ---------------------------------------------------------------------------
 # Ctrl-C
 # ---------------------------------------------------------------------------
@@ -872,7 +918,7 @@ def test_a_run_from_another_matrix_with_the_same_name_is_not_adopted(tmp_path):
 
 def test_ctrl_c_stops_the_stream_marks_the_run_aborted_and_writes_a_row(tmp_path):
     world = FakeWorld()
-    world.interrupt_at_tick = 3  # during the consumer phase of cell 1
+    world.interrupt_at_ticks = {3}  # during the consumer phase of cell 1
     spec, cells = two_cells()
     code = runner(world).run(spec, cells, ledger=tmp_path / "runs.jsonl")
 
@@ -883,6 +929,46 @@ def test_ctrl_c_stops_the_stream_marks_the_run_aborted_and_writes_a_row(tmp_path
     assert world.control["is_active"] is False
     assert world.control["producer_active"] is False
     assert len(world.runs) == 1, "the second cell never started"
+
+
+def interrupted_after_a_retrain(world: FakeWorld, *presses: int) -> list[Cell]:
+    """The adaptive cell alone, with model 2 promoted at tick 3 and Ctrl-C
+    pressed on ``presses``; tick 4 is inside the consumer phase."""
+    retrain_promotes_during(world, run_id=1)
+    world.interrupt_at_ticks = set(presses)
+    _, cells = two_cells()
+    return [c for c in cells if c.adaptation_enabled]
+
+
+def test_ctrl_c_puts_the_base_model_back_once_the_query_has_let_go(tmp_path):
+    """Resuming resolves ``base_model = "active"`` again: without the reset
+    the remaining cells would run from the retrained model."""
+    world = FakeWorld(release_ticks=2)
+    spec, _ = two_cells()
+    adaptive = interrupted_after_a_retrain(world, 4)
+    code = runner(world).run(spec, adaptive, ledger=tmp_path / "runs.jsonl")
+
+    assert code == 130
+    promotes = world.calls_named("promote_model")
+    assert [arg for _, arg, _ in promotes] == [(1, True), (2, False), (1, True)]
+    assert world.active_model == 1
+    (_, _, at_reset) = promotes[-1]
+    assert at_reset["consumer_query_run_id"] is None, "not underneath a query still stopping"
+    assert at_reset["is_active"] is False
+
+
+def test_a_second_ctrl_c_during_the_reset_still_exits_130_and_says_how_to_resume(
+    tmp_path, caplog
+):
+    world = FakeWorld(release_ticks=2)
+    spec, _ = two_cells()
+    adaptive = interrupted_after_a_retrain(world, 4, 5)
+    with caplog.at_level(logging.WARNING, logger="streamcls.matrix"):
+        code = runner(world).run(spec, adaptive, ledger=tmp_path / "runs.jsonl")
+
+    assert code == 130
+    assert world.active_model == 2, "the reset was abandoned"
+    assert any("--base-model 1" in r.getMessage() for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
