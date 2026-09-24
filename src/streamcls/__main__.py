@@ -2,13 +2,20 @@
 
 ``score`` turns finished runs into the results table the thesis reports.
 ``compare`` prints the A/B figure for a seed-matched pair.
+``matrix`` runs a declared experiment matrix unattended; ``report``
+aggregates its ledger into the thesis tables.
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import functools
 import json
+import logging
+import subprocess
 import sys
+from pathlib import Path
 
 from streamcls.config import get_settings
 from streamcls.db.queries import fetch_run_bundle, list_runs
@@ -87,6 +94,162 @@ def _pct(value) -> str:
     return "—" if value is None else f"{value * 100:.1f}%"
 
 
+# --- matrix -----------------------------------------------------------------
+
+
+def cmd_matrix(args) -> int:
+    from streamcls.matrix import (
+        MatrixRunner,
+        RunnerError,
+        SpecError,
+        completed_keys,
+        estimate_seconds,
+        expand,
+        load_spec,
+        select_cells,
+    )
+
+    try:
+        spec = load_spec(args.spec)
+        if args.timeout is not None:
+            spec = dataclasses.replace(spec, timeout_minutes=args.timeout)
+        if args.base_model is not None:
+            spec = dataclasses.replace(spec, base_model=args.base_model)
+        cells = select_cells(expand(spec), args.only)
+    except SpecError as error:
+        print(f"{args.spec}: {error}", file=sys.stderr)
+        return 2
+    if not cells:
+        print(f"{args.spec}: no cell matches {args.only}", file=sys.stderr)
+        return 2
+
+    ledger = Path(args.results) / spec.name / "runs.jsonl"
+    done = completed_keys(ledger)
+    pending = [c for c in cells if c.key not in done]
+
+    print(f"matrix {spec.name}: {len(cells)} cell(s), {len(pending)} pending, ledger {ledger}")
+    print(f"{'#':>3}  {'cell':<52} {'msgs':>6} {'batches':>7} {'est':>6}  status")
+    for index, cell in enumerate(cells, start=1):
+        state = "done" if cell.key in done else "pending"
+        print(f"{index:>3}  {cell.key:<52} {cell.total_messages:>6} {cell.batches:>7} "
+              f"{_hms(estimate_seconds(cell)):>6}  {state}")
+    total = sum(estimate_seconds(c) for c in pending)
+    print(f"\nestimated wall clock for the pending cells: ~{_hms(total)} "
+          f"(trigger {spec.config['trigger_seconds']} s, "
+          f"batch {spec.config['max_offsets_per_trigger']} msgs)")
+    if args.dry_run:
+        return 0
+
+    logging.basicConfig(
+        stream=sys.stderr, level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    # kafka-python logs every connection state change at INFO; one topic
+    # creation per cell is nine lines of it.
+    logging.getLogger("kafka").setLevel(logging.WARNING)
+    settings = get_settings()
+    from streamcls.kafka_admin import ensure_topic
+
+    commit, dirty = _git_state()
+    if dirty:
+        logging.getLogger("streamcls.matrix").warning(
+            "working tree is dirty; the ledger records commit %s with git_dirty=true", commit[:12]
+        )
+    with Repository(settings.postgres) as repo:
+        runner = MatrixRunner(
+            repo,
+            topic_for_run=settings.kafka.topic_for_run,
+            ensure_topic=functools.partial(
+                ensure_topic, settings.kafka.bootstrap_servers,
+                partitions=settings.kafka.num_partitions,
+            ),
+            score=functools.partial(_score, repo),
+            git_commit=commit,
+            git_dirty=dirty,
+            poll_s=args.poll,
+        )
+        try:
+            return runner.run(spec, cells, ledger=ledger, stop_on_timeout=args.stop_on_timeout)
+        except (RunnerError, SpecError, LookupError) as error:
+            print(f"cannot start: {error}", file=sys.stderr)
+            return 2
+
+
+def cmd_report(args) -> int:
+    from streamcls.experiments import (
+        Result,
+        aggregate,
+        detector_table,
+        pair,
+        render_markdown,
+        write_csv,
+        write_detectors_csv,
+        write_pairs_csv,
+    )
+    from streamcls.matrix import read_ledger
+
+    results_dir = Path(args.results_dir)
+    ledger = results_dir / "runs.jsonl"
+    rows = read_ledger(ledger)
+    if not rows:
+        print(f"{ledger}: no results", file=sys.stderr)
+        return 1
+
+    # The last row per cell is the one that counts: an earlier timed-out
+    # attempt is superseded by the completed re-run appended after it.
+    latest: dict[str, dict] = {}
+    for row in rows:
+        latest[row.get("key", "")] = row
+    completed = [r for r in latest.values() if r.get("status") == "completed" and r.get("score")]
+    unfinished = sorted(k for k, r in latest.items() if r.get("status") != "completed")
+    if not completed:
+        print(f"{ledger}: no completed cells", file=sys.stderr)
+        return 1
+
+    results = [Result.from_row(r) for r in completed]
+    name = str(completed[0].get("matrix") or results_dir.name)
+    summaries = aggregate(results)
+    pairs = pair(results)
+    detectors = detector_table(results)
+
+    write_csv(results_dir / "summary.csv", summaries)
+    write_pairs_csv(results_dir / "pairs.csv", pairs)
+    write_detectors_csv(results_dir / "detectors.csv", detectors)
+    markdown = render_markdown(summaries, pairs, detectors, name=name)
+    if unfinished:
+        markdown += (
+            f"\n\n_{len(unfinished)} cell(s) not completed: "
+            + ", ".join(f"`{k}`" for k in unfinished) + "_\n"
+        )
+    (results_dir / "summary.md").write_text(markdown, encoding="utf-8")
+    print(markdown)
+    print(f"\nwrote summary.md, summary.csv, pairs.csv, detectors.csv to {results_dir}/",
+          file=sys.stderr)
+    return 0
+
+
+def _git_state() -> tuple[str, bool]:
+    """``(HEAD, dirty)`` for the ledger; empty and clean when git is unavailable."""
+    try:
+        run = functools.partial(
+            subprocess.run, capture_output=True, text=True, timeout=5, check=True
+        )
+        commit = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+        dirty = bool(run(["git", "status", "--porcelain"]).stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        return "", False
+    return commit, dirty
+
+
+def _hms(seconds: float) -> str:
+    minutes, sec = divmod(round(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}:{minutes:02d}:{sec:02d}" if hours else f"{minutes}:{sec:02d}"
+
+
+# --- entry point --------------------------------------------------------------
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="streamcls")
     parser.add_argument("--batch-size", type=int, default=None,
@@ -94,21 +257,56 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     runs = sub.add_parser("runs", help="list experiment runs")
-    runs.set_defaults(func=cmd_runs)
+    runs.set_defaults(func=cmd_runs, needs_db=True)
 
     score = sub.add_parser("score", help="score runs and print the results table")
     score.add_argument("runs", nargs="*", type=int, help="run ids (default: most recent)")
     score.add_argument("--limit", type=int, default=10)
     score.add_argument("--json", action="store_true")
-    score.set_defaults(func=cmd_score)
+    score.set_defaults(func=cmd_score, needs_db=True)
 
     cmp_parser = sub.add_parser("compare", help="A/B two seed-matched runs")
     cmp_parser.add_argument("baseline", type=int)
     cmp_parser.add_argument("adaptive", type=int)
     cmp_parser.add_argument("--json", action="store_true")
-    cmp_parser.set_defaults(func=cmd_compare)
+    cmp_parser.set_defaults(func=cmd_compare, needs_db=True)
+
+    matrix = sub.add_parser(
+        "matrix",
+        help="run an experiment matrix unattended",
+        description="Runs every cell of a TOML matrix spec against the live stack, one at a "
+                    "time, appending one line per cell to results/<name>/runs.jsonl. "
+                    "Re-running skips cells already completed there.",
+    )
+    matrix.add_argument("spec", help="path to the matrix spec (TOML)")
+    matrix.add_argument("--dry-run", action="store_true",
+                        help="print the cell table and estimate; touch nothing")
+    matrix.add_argument("--only", metavar="PATTERN", action="append", default=[],
+                        help="run only cells whose key matches (shell glob; repeatable)")
+    matrix.add_argument("--results", default="results", metavar="DIR",
+                        help="ledger root (default: results/)")
+    matrix.add_argument("--stop-on-timeout", action="store_true",
+                        help="end the matrix at the first cell that times out")
+    matrix.add_argument("--base-model", type=int, default=None, metavar="ID",
+                        help="model version every cell starts from (default: from the spec)")
+    matrix.add_argument("--timeout", type=float, default=None, metavar="MIN",
+                        help="per-cell timeout in minutes (default: from the spec)")
+    matrix.add_argument("--poll", type=float, default=5.0, metavar="SEC",
+                        help="control-plane poll interval (default: 5)")
+    matrix.set_defaults(func=cmd_matrix, needs_db=False)
+
+    report = sub.add_parser(
+        "report",
+        help="aggregate a matrix ledger into summary tables",
+        description="Reads results/<name>/runs.jsonl and writes summary.md, summary.csv, "
+                    "pairs.csv and detectors.csv next to it. No database access.",
+    )
+    report.add_argument("results_dir", help="the matrix's results directory")
+    report.set_defaults(func=cmd_report, needs_db=False)
 
     args = parser.parse_args(argv)
+    if not args.needs_db:
+        return int(args.func(args))
     with Repository(get_settings().postgres) as repo:
         return int(args.func(args, repo))
 

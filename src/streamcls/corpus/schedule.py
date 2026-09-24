@@ -32,7 +32,14 @@ from typing import Any
 
 from streamcls.labels import N_CLASSES
 
-__all__ = ["DriftKind", "DriftSchedule", "StreamState", "uniform_weights"]
+__all__ = [
+    "PRESETS",
+    "DriftKind",
+    "DriftSchedule",
+    "StreamState",
+    "preset",
+    "uniform_weights",
+]
 
 
 class DriftKind(StrEnum):
@@ -179,3 +186,68 @@ class DriftSchedule:
             kind=kind,
             is_drift_point=index in set(self.change_points),
         )
+
+
+# ---------------------------------------------------------------------------
+# Named scenarios
+# ---------------------------------------------------------------------------
+#: The scenarios the results matrix is built from, in the order the tables list
+#: them. Change points are fractions of the run so the same name means the same
+#: shape at any length. ``stationary`` is the false-alarm control.
+PRESETS: tuple[str, ...] = (
+    "stationary",
+    "prior_shift",
+    "covariate_gradual",
+    "concept_abrupt",
+    "recurring",
+)
+
+
+def preset(name: str, total_messages: int) -> list[dict[str, Any]]:
+    """The drift schedule for a named scenario over ``total_messages``.
+
+    The concept map is a bijection (``2 <-> 3``), not ``{2: 3}``: a
+    one-directional map makes two classes draw from the same text pool under
+    different labels, which is irreducibly ambiguous, so accuracy is capped by
+    Bayes error and no amount of adaptation can recover it.
+    """
+    total = int(total_messages)
+    if total < 8:
+        raise ValueError(f"total_messages must be at least 8, got {total}")
+    schedules: dict[str, list[dict[str, Any]]] = {
+        "stationary": [],
+        "prior_shift": [
+            {
+                "at": total // 3,
+                "kind": str(DriftKind.PRIOR_SHIFT),
+                "params": {"weights": [0.7, 0.1, 0.1, 0.1]},
+            }
+        ],
+        "covariate_gradual": [
+            {
+                "at": total // 3,
+                "kind": str(DriftKind.COVARIATE_GRADUAL),
+                "params": {"to": 0.9, "over": total // 3},
+            }
+        ],
+        "concept_abrupt": [
+            {
+                "at": total // 2,
+                "kind": str(DriftKind.CONCEPT_ABRUPT),
+                "params": {"map": {"2": 3, "3": 2}},
+            }
+        ],
+        "recurring": [
+            {
+                "at": total // 4,
+                "kind": str(DriftKind.RECURRING),
+                "params": {"period": total // 8, "to": 0.85},
+            }
+        ],
+    }
+    try:
+        events = schedules[name]
+    except KeyError:
+        raise ValueError(f"unknown scenario {name!r}; choose from {', '.join(PRESETS)}") from None
+    DriftSchedule(events=[dict(e) for e in events])  # validates
+    return events

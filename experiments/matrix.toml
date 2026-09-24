@@ -1,0 +1,79 @@
+# The thesis results matrix: 5 scenarios x 3 seeds x 2 arms, plus 4 ablations
+# on the two scenarios where the retraining policy matters most (54 cells).
+#
+#   make matrix ARGS=--dry-run     # the plan and a wall-clock estimate
+#   make matrix                    # runs it; resumable, one line per cell in
+#                                  # results/thesis-v1/runs.jsonl
+#   make report                    # summary.md / summary.csv / pairs.csv
+#
+# Every cell starts from the same base model with the same stream_config
+# (the [config] block is written before each cell), consumes its own Kafka
+# topic from offset 0, and is scored only once its retrains have finished.
+
+[matrix]
+name = "thesis-v1"
+seeds = [20260827, 20260828, 20260829]
+arms = ["baseline", "adaptive"]     # baseline never retrains; the A/B control
+
+[defaults]
+total_messages = 16000              # 32 batches of 500; drift lands at batch 16
+mode = "replay"                     # producer writes the whole run, then the consumer starts
+dataset_split = "agnews-stream-holdout-v1"
+timeout_minutes = 25                # ~6 min expected per cell; a stall is a bug, not a wait
+base_model = "active"               # resolved once at start and pinned for every cell
+
+# stream_config as every cell sees it. Pinned here rather than inherited from
+# whatever the dashboard was last set to, so the matrix is reproducible from
+# this file plus the commit it records. Batch-denominated results (detection
+# delay, recovery, swap latency) depend on trigger_seconds and
+# max_offsets_per_trigger in particular.
+[config]
+trigger_seconds = 10
+max_offsets_per_trigger = 500
+max_message_length = 4000
+adwin_delta = 0.002
+psi_threshold = 0.2
+psi_consecutive_batches = 3
+grace_batches = 5
+adaptation_enabled = true           # the arm decides per run; this must not veto it
+auto_promote = true
+promote_min_delta = 0.01
+min_batches_between_retrains = 10
+max_retrains_per_run = 10
+retrain_window_rows = 20000
+retrain_min_new_rows = 2000
+retrain_base_rows = 20000
+label_delay_batches = 0
+actionable_detectors = ["adwin_error"]
+
+# Presets from streamcls.corpus.schedule, scaled to total_messages. A scenario
+# may instead give an explicit `schedule = [{at=..., kind=..., params={...}}]`.
+[scenarios.stationary]              # false-alarm scenario: no change point
+[scenarios.prior_shift]
+[scenarios.covariate_gradual]
+[scenarios.concept_abrupt]
+[scenarios.recurring]
+
+# Ablations run the adaptive arm with one knob changed. retrain_base_rows is
+# the anti-forgetting sample mixed into every retrain (0 = retrain on the new
+# concept alone); retrain_min_new_rows is how much of the new concept must
+# have arrived before a detection is acted on.
+[[ablations]]
+name = "base_rows_0"
+scenarios = ["concept_abrupt", "covariate_gradual"]
+config = { retrain_base_rows = 0 }
+
+[[ablations]]
+name = "base_rows_5000"
+scenarios = ["concept_abrupt", "covariate_gradual"]
+config = { retrain_base_rows = 5000 }
+
+[[ablations]]
+name = "min_new_500"
+scenarios = ["concept_abrupt", "covariate_gradual"]
+config = { retrain_min_new_rows = 500 }
+
+[[ablations]]
+name = "min_new_4000"
+scenarios = ["concept_abrupt", "covariate_gradual"]
+config = { retrain_min_new_rows = 4000 }

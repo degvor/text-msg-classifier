@@ -1,0 +1,45 @@
+# A two-cell matrix that exercises the whole lifecycle in about five minutes:
+# one abrupt concept drift, one seed, both arms. Run it before the real
+# matrix and after any change to the consumer, trainer or runner.
+#
+#   make matrix SPEC=experiments/smoke.toml ARGS=--dry-run
+#   make matrix SPEC=experiments/smoke.toml
+#   make report NAME=smoke
+#
+# 2 000 messages is 4 batches of 500 with the drift at batch 2, so the short
+# trigger and the low retrain_min_new_rows are what let the adaptive arm
+# actually retrain inside the run. The numbers it produces are a smoke
+# signal, not a result.
+
+[matrix]
+name = "smoke"
+seeds = [20260827]
+arms = ["baseline", "adaptive"]
+
+[defaults]
+total_messages = 2000
+mode = "replay"
+dataset_split = "agnews-stream-holdout-v1"
+timeout_minutes = 10
+base_model = "active"
+
+[config]
+trigger_seconds = 5
+max_offsets_per_trigger = 500
+max_message_length = 4000
+adwin_delta = 0.002
+psi_threshold = 0.2
+psi_consecutive_batches = 3
+grace_batches = 1
+adaptation_enabled = true
+auto_promote = true
+promote_min_delta = 0.01
+min_batches_between_retrains = 1
+max_retrains_per_run = 10
+retrain_window_rows = 20000
+retrain_min_new_rows = 500
+retrain_base_rows = 20000
+label_delay_batches = 0
+actionable_detectors = ["adwin_error"]
+
+[scenarios.concept_abrupt]

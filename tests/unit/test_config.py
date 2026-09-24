@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from streamcls.config import PostgresSettings, Settings, get_settings
+from streamcls.config import KafkaSettings, PostgresSettings, Settings, get_settings
 
 
 def test_password_has_no_default(monkeypatch):
@@ -44,3 +44,12 @@ def test_max_offsets_per_trigger_is_always_set():
 
 def test_get_settings_is_cached():
     assert get_settings() is get_settings()
+
+
+def test_every_run_gets_its_own_topic(monkeypatch):
+    """A shared topic made run N's batch ids start where run N-1's ended."""
+    monkeypatch.setenv("KAFKA_TOPIC", "posts")
+    kafka = KafkaSettings(_env_file=None)
+    assert kafka.topic_for_run(7) == "posts.run-7"
+    assert kafka.topic_for_run(7) != kafka.topic_for_run(8)
+    assert kafka.topic_for_run("12") == "posts.run-12"

@@ -50,7 +50,7 @@ from types import FrameType
 from streamcls.config import Settings, get_settings
 from streamcls.corpus.schedule import DriftSchedule
 from streamcls.db.repo import ControlState, ModelRecord, Repository
-from streamcls.drift.monitor import DriftMonitor, DriftSignal, MonitorConfig
+from streamcls.drift.monitor import DEFAULT_ACTIONABLE, DriftMonitor, DriftSignal, MonitorConfig
 from streamcls.logging import configure, get_logger
 from streamcls.schemas import spark_schema
 from streamcls.spark.batch import aggregate_batch, pack_correct_bits, score
@@ -92,22 +92,6 @@ class Consumer:
         started = time.monotonic()
         self._model = PipelineModel.load(record.artifact_path)
         self._model_record = record
-        config = self.repo.read_config()
-        # A fresh monitor per model: PSI is defined relative to *this* model's
-        # training distribution, so the references swap with the model, and the
-        # detectors start cold behind a grace window rather than carrying the
-        # previous model's error history.
-        self._monitor = DriftMonitor(
-            config=MonitorConfig(
-                adwin_delta=float(config["adwin_delta"]),
-                psi_threshold=float(config["psi_threshold"]),
-                psi_consecutive_batches=int(config["psi_consecutive_batches"]),
-                grace_batches=int(config["grace_batches"]),
-            ),
-            reference_histogram=list(record.reference_histogram or []),
-            confidence_reference=list(record.confidence_reference or []),
-            top_term_indices=list(record.top_term_indices or []),
-        )
         self.repo.set_active_model(record.id)
         log.info(
             "model loaded",
@@ -117,6 +101,34 @@ class Consumer:
                 "seconds": round(time.monotonic() - started, 2),
             },
         )
+
+    def _new_monitor(self, record: ModelRecord, config: dict) -> DriftMonitor:
+        """A cold monitor for one (run, model) pair.
+
+        Built at every query start, not only when the model changes. PSI is
+        defined relative to *this* model's training distribution, so the
+        references travel with the model; and the detectors must start cold
+        behind a grace window for every run, or the second run on the same
+        model would inherit the first run's ADWIN window and skip its grace
+        period. Any history for *this* run is replayed on top by the caller.
+        """
+        actionable = config.get("actionable_detectors")
+        monitor = DriftMonitor(
+            config=MonitorConfig(
+                adwin_delta=float(config["adwin_delta"]),
+                psi_threshold=float(config["psi_threshold"]),
+                psi_consecutive_batches=int(config["psi_consecutive_batches"]),
+                grace_batches=int(config["grace_batches"]),
+                actionable_detectors=(
+                    frozenset(actionable) if actionable is not None else DEFAULT_ACTIONABLE
+                ),
+            ),
+            reference_histogram=list(record.reference_histogram or []),
+            confidence_reference=list(record.confidence_reference or []),
+            top_term_indices=list(record.top_term_indices or []),
+        )
+        self._pending_drift = None
+        return monitor
 
     # --- per-batch -----------------------------------------------------------
     def _make_foreach_batch(self, run_id: int):
@@ -316,7 +328,13 @@ class Consumer:
         raw = (
             self.spark.readStream.format("kafka")
             .option("kafka.bootstrap.servers", self.settings.kafka.bootstrap_servers)
-            .option("subscribe", self.settings.kafka.topic)
+            # One topic per run. With a shared topic and a per-run checkpoint,
+            # `earliest` made every new run first drain all earlier runs as
+            # filtered-empty batches, so batch ids no longer started at 0 and
+            # every batch-denominated figure (detection delay, recovery) was
+            # offset by the size of history. The topic is created by whoever
+            # starts the run (producer or matrix runner); see kafka_admin.
+            .option("subscribe", self.settings.kafka.topic_for_run(run_id))
             .option("startingOffsets", "earliest")
             # Mandatory: without it a batch is bounded only by Kafka backlog,
             # which is both a driver-OOM risk and the reason batch composition
@@ -332,6 +350,7 @@ class Consumer:
                 F.from_json(F.col("value").cast("string"), spark_schema()).alias("d"),
             )
             .select("_offset", "d.*")
+            # Belt and braces: the topic already carries only this run.
             .filter(F.col("experiment_run_id") == run_id)
             .filter(F.col("text").isNotNull())
             # length(), not a regex. `rlike("^.{0,N}$")` silently dropped every
@@ -355,6 +374,9 @@ class Consumer:
         query = None  # bound before the try: the old `finally` referenced an
         # unbound name behind a bare `except:` that also swallowed KeyboardInterrupt
         log.info("consumer starting", extra={"poll_seconds": POLL_SECONDS})
+        # A consumer that died hard (OOM, SIGKILL) never cleared its flag; a
+        # fresh process holds no query, so the flag is wrong until it says so.
+        self.repo.set_consumer_query(None)
 
         try:
             while not self.stop_event.is_set():
@@ -384,31 +406,42 @@ class Consumer:
                         # at start(), so an in-place swap is not possible --
                         # stop-and-restart is the honest mechanism, and its
                         # latency is a measurement rather than a limitation.
+                        # The monitor is rebuilt when the query restarts.
                         self._load_model(desired)
                     continue
 
                 if query is None and control.is_active:
                     if control.active_experiment_run_id is None:
                         log.warning("stream active with no experiment run; idling")
-                        self.stop_event.wait(POLL_SECONDS)
+                        self._idle()
                         continue
                     if desired is None:
                         log.warning("no active model version; idling")
-                        self.stop_event.wait(POLL_SECONDS)
+                        self._idle()
+                        continue
+                    run_id = control.active_experiment_run_id
+                    if self.repo.load_run(run_id).status == "draft":
+                        # The producer creates the run's topic before it marks
+                        # the run started; subscribing before that fails.
+                        log.info("run not started yet; waiting for producer", extra={"run_id": run_id})
+                        self._idle()
                         continue
                     if self._model_record is None or self._model_record.id != desired.id:
                         self._load_model(desired)
-                    run_id = control.active_experiment_run_id
-                    # Replay, never unpickle: detector internals are not a
-                    # version-stable contract, and correct_bits makes this exact.
+                    config = self.repo.read_config()
+                    # Always a cold monitor, then replay -- never unpickle:
+                    # detector internals are not a version-stable contract, and
+                    # correct_bits makes the replay exact.
+                    self._monitor = self._new_monitor(desired, config)
                     history = self.repo.batch_metrics_since(run_id)
-                    if history and self._monitor is not None:
+                    if history:
                         self._monitor.rebuild(history)
                         log.info(
                             "detector state rebuilt by replay",
                             extra={"batches": len(history)},
                         )
-                    query = self._start_query(run_id, self.repo.read_config())
+                    query = self._start_query(run_id, config)
+                    self.repo.set_consumer_query(run_id)
                     self._failures = 0
                     log.info("query started", extra={"run_id": run_id})
                     continue
@@ -420,10 +453,11 @@ class Consumer:
                     if query.awaitTermination(timeout=POLL_SECONDS):
                         error = query.exception()
                         query = None
+                        self.repo.set_consumer_query(None)
                         if error is not None and not self._backoff(error):
                             self.repo.set_stream_active(False)
                 else:
-                    self.stop_event.wait(POLL_SECONDS)
+                    self._idle()
         finally:
             if query is not None:
                 try:
@@ -443,12 +477,24 @@ class Consumer:
                 log.exception("desired model version missing", extra={"model_id": target})
         return self.repo.get_active_model()
 
-    @staticmethod
-    def _stop_query(query) -> None:
-        query.stop()
-        # Bounded: an unbounded await here would reintroduce the original hang,
-        # just somewhere else, and SIGTERM would time out into a SIGKILL.
-        query.awaitTermination(timeout=60)
+    def _stop_query(self, query) -> None:
+        try:
+            query.stop()
+            # Bounded: an unbounded await here would reintroduce the original
+            # hang, just somewhere else, and SIGTERM would time out into a
+            # SIGKILL.
+            query.awaitTermination(timeout=60)
+        finally:
+            # Cleared even if stop() raised: a flag that never clears would
+            # block the matrix runner forever, which is the worse failure.
+            self.repo.set_consumer_query(None)
+
+    def _idle(self) -> None:
+        """Sleep one poll, but stay visibly alive: the dashboard and the matrix
+        runner read the heartbeat, and until now it was only written from
+        inside a batch, so an idle consumer looked identical to a dead one."""
+        self.repo.consumer_heartbeat()
+        self.stop_event.wait(POLL_SECONDS)
 
     def _backoff(self, error: BaseException) -> bool:
         self._failures += 1

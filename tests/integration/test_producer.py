@@ -200,6 +200,21 @@ def test_post_ids_from_different_runs_can_coexist(topic, pool):
     assert ids_one.isdisjoint(ids_two)
 
 
+def test_ensure_topic_creates_once_and_is_then_a_no_op(topic):
+    """Whoever starts a run first creates its topic; the second caller (or a
+    restart) must find it already there rather than fail."""
+    from streamcls.kafka_admin import ensure_topic
+
+    assert ensure_topic(BOOTSTRAP, topic, partitions=1) is True
+    assert ensure_topic(BOOTSTRAP, topic, partitions=1) is False
+
+    admin = kafka.KafkaAdminClient(bootstrap_servers=BOOTSTRAP, request_timeout_ms=10_000)
+    try:
+        assert topic in admin.list_topics()
+    finally:
+        admin.close()
+
+
 def test_run_lifecycle_is_recorded_in_postgres(repo):
     """The control plane the producer polls: activate a run, and the producer's
     own bookkeeping marks it started and then completed."""

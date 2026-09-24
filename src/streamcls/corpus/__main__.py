@@ -15,6 +15,7 @@ from pathlib import Path
 from streamcls.config import get_settings
 from streamcls.corpus.agnews import SOURCES, ensure_agnews
 from streamcls.corpus.perturb import Perturber
+from streamcls.corpus.schedule import PRESETS, preset
 from streamcls.corpus.splits import DEFAULT_SIZES, build_splits, fingerprint
 from streamcls.labels import id_to_key
 
@@ -77,27 +78,7 @@ def cmd_sample(args: argparse.Namespace) -> int:
 
 def cmd_schedule(args: argparse.Namespace) -> int:
     """Print a ready-made drift schedule to paste into an ExperimentRun."""
-    total = args.total
-    schedules = {
-        "stationary": [],
-        "prior_shift": [
-            {"at": total // 3, "kind": "prior_shift", "params": {"weights": [0.7, 0.1, 0.1, 0.1]}}
-        ],
-        "covariate_gradual": [
-            {
-                "at": total // 3,
-                "kind": "covariate_gradual",
-                "params": {"to": 0.9, "over": total // 3},
-            }
-        ],
-        "concept_abrupt": [
-            {"at": total // 2, "kind": "concept_abrupt", "params": {"map": {"2": 3}}}
-        ],
-        "recurring": [
-            {"at": total // 4, "kind": "recurring", "params": {"period": total // 8, "to": 0.85}}
-        ],
-    }
-    print(json.dumps(schedules[args.scenario], indent=2))
+    print(json.dumps(preset(args.scenario, args.total), indent=2))
     return 0
 
 
@@ -121,9 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     sample.set_defaults(func=cmd_sample)
 
     schedule = sub.add_parser("schedule", help="emit a drift schedule as JSON")
-    schedule.add_argument("scenario", choices=[
-        "stationary", "prior_shift", "covariate_gradual", "concept_abrupt", "recurring"
-    ])
+    schedule.add_argument("scenario", choices=list(PRESETS))
     schedule.add_argument("--total", type=int, default=20_000)
     schedule.set_defaults(func=cmd_schedule)
 

@@ -65,6 +65,28 @@ def test_an_error_spike_triggers_adaptation():
     assert any(r.should_adapt for r in results)
 
 
+def test_the_actionable_set_is_an_experiment_variable():
+    """The scenario x detector table widens the actionable set to DDM to
+    measure what its false alarms would have cost. The same stationary stream
+    that never triggers by default must trigger once DDM is allowed to act."""
+    permissive = monitor(actionable_detectors=frozenset({"ddm", "adwin_error"}))
+    strict = monitor()
+    permissive_fired = strict_fired = False
+    for seed in range(12):
+        permissive_fired |= permissive.observe(batch(0.10, seed)).should_adapt
+        strict_fired |= strict.observe(batch(0.10, seed)).should_adapt
+    assert permissive_fired and not strict_fired
+
+
+def test_an_empty_actionable_set_records_everything_and_acts_on_nothing():
+    m = monitor(actionable_detectors=frozenset())
+    for seed in range(6):
+        m.observe(batch(0.10, seed))
+    results = [m.observe(batch(0.45, 100 + seed)) for seed in range(4)]
+    assert any(r.unsuppressed for r in results)
+    assert not any(r.should_adapt for r in results)
+
+
 def test_the_firing_detector_is_named():
     m = monitor()
     for seed in range(6):

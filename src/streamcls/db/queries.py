@@ -30,7 +30,8 @@ def fetch_run_bundle(repo, run_id: int) -> dict[str, Any]:
     with repo.cursor() as cur:
         cur.execute(
             f"""
-            SELECT id, name, seed, adaptation_enabled, drift_schedule, status, total_messages
+            SELECT id, name, seed, adaptation_enabled, drift_schedule, status, total_messages,
+                   scenario, consumer_config, base_model_version_id
             FROM {Table.EXPERIMENT_RUN} WHERE id = %s
             """,
             (run_id,),
@@ -60,10 +61,16 @@ def fetch_run_bundle(repo, run_id: int) -> dict[str, Any]:
         )
         events = [dict(r) for r in cur.fetchall()]
 
+        # A retrain "promoted" if the model it produced was ever activated:
+        # register_model leaves activated_at NULL and only promote_model sets
+        # it, after the guard passes.
         cur.execute(
             f"""
-            SELECT id, status, model_version_id, requested_at, finished_at
-            FROM {Table.TRAINING_JOB} WHERE experiment_run_id = %s ORDER BY id
+            SELECT j.id, j.status, j.model_version_id, j.requested_at, j.finished_at,
+                   (m.activated_at IS NOT NULL) AS promoted
+            FROM {Table.TRAINING_JOB} j
+            LEFT JOIN {Table.MODEL_VERSION} m ON m.id = j.model_version_id
+            WHERE j.experiment_run_id = %s ORDER BY j.id
             """,
             (run_id,),
         )

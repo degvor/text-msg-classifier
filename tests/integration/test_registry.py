@@ -176,6 +176,26 @@ def test_promotion_compares_recent_scores_when_both_have_them(repo):
     assert ModelVersion.objects.get(pk=new).status == ModelStatus.ACTIVE
 
 
+def test_force_resets_to_a_worse_model_but_still_retires_the_incumbent(repo):
+    """Between experiment cells the base model must come back regardless of
+    how it scores against the retrained incumbent. Whether the guard would let
+    it back depends on which scores happen to exist (a base model with no
+    recent score is compared on the stale test set, where it wins); a reset
+    must not depend on that, so it bypasses the guard. It must not bypass the
+    single-active invariant."""
+    base = _register(repo, "base", accuracy=0.90, recent=0.60)
+    repo.promote_model(base)
+    retrained = _register(repo, "retrained", accuracy=0.70, recent=0.95)
+    assert repo.promote_model(retrained) is True
+    assert repo.promote_model(base, min_delta=0.01) is False
+
+    assert repo.promote_model(base, force=True) is True
+    assert ModelVersion.objects.get(pk=base).status == ModelStatus.ACTIVE
+    assert ModelVersion.objects.get(pk=retrained).status == ModelStatus.RETIRED
+    assert ModelVersion.objects.filter(status=ModelStatus.ACTIVE).count() == 1
+    assert StreamStatus.load().desired_model_version_id == base
+
+
 def test_promotion_falls_back_to_measured_live_accuracy(repo):
     """The usual case: the incumbent was trained offline and has no recent
     score, so its measured live accuracy over recent batches stands in."""

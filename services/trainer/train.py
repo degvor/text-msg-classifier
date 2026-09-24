@@ -307,6 +307,7 @@ def register(
             top_term_indices=result.top_term_indices,
             reference_histogram=result.reference_histogram,
             confidence_reference=result.confidence_reference,
+            created_by_run=run_id,
             git_commit=_git_commit(),
         )
         log.info("registered", extra={"model_id": model_id, "version": result.version})

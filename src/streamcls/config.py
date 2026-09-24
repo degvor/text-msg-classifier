@@ -61,10 +61,22 @@ class KafkaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="KAFKA_", env_file=_ENV_FILE, extra="ignore")
 
     bootstrap_servers: str = "kafka:9092"
+    #: Prefix, not a topic. Every run gets its own topic (see
+    #: :meth:`topic_for_run`) so Spark's batch ids start at 0 for each run.
     topic: str = "posts"
     #: Experiments run on a single partition so batch composition is
     #: deterministic. Scalability benchmarks override this.
     num_partitions: int = 1
+
+    def topic_for_run(self, run_id: int) -> str:
+        """The Kafka topic carrying exactly one experiment run.
+
+        A shared topic plus a per-run checkpoint made run N first replay every
+        earlier run as filtered-empty micro-batches, so its batch ids started
+        at roughly N x 32 while the scorer, the consumer's detection-delay
+        arithmetic and the dashboard all assume 0.
+        """
+        return f"{self.topic}.run-{int(run_id)}"
 
 
 class PathSettings(BaseSettings):

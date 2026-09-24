@@ -34,6 +34,7 @@ from streamcls.corpus.schedule import DriftSchedule
 from streamcls.corpus.splits import build_splits
 from streamcls.corpus.stream import SeededStream
 from streamcls.db.repo import Repository, RunSpec
+from streamcls.kafka_admin import ensure_topic
 from streamcls.logging import configure, get_logger
 
 log = get_logger(__name__)
@@ -149,7 +150,23 @@ class Producer:
             total_messages=run.total_messages,
         )
 
-        log.info("run starting", extra=dict(stream.describe()) | {"mode": run.mode})
+        # One topic per run, so Spark's batch ids start at 0 for this run.
+        # Created before the run is marked started: a run whose status is no
+        # longer "draft" therefore always has a topic the consumer can subscribe
+        # to, which is what the consumer's draft guard relies on.
+        topic = self.settings.kafka.topic_for_run(run.id)
+        try:
+            ensure_topic(
+                self.settings.kafka.bootstrap_servers,
+                topic,
+                partitions=self.settings.kafka.num_partitions,
+            )
+        except KafkaError:
+            log.exception("could not create topic", extra={"run_id": run.id, "topic": topic})
+            self.repo.mark_run_finished(run.id, status="aborted")
+            return
+
+        log.info("run starting", extra=dict(stream.describe()) | {"mode": run.mode, "topic": topic})
         self.repo.mark_run_started(run.id)
 
         # Replay mode writes everything as fast as Kafka accepts it, so the
@@ -161,7 +178,6 @@ class Producer:
         if run.mode == "live" and run.rate_msgs_per_sec > 0:
             delay = 1.0 / run.rate_msgs_per_sec
 
-        topic = self.settings.kafka.topic
         sent = 0
         try:
             for message in stream:

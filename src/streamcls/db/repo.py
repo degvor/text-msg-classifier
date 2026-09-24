@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,7 +26,7 @@ from psycopg2.extras import Json
 from streamcls.config import PostgresSettings
 from streamcls.db.tables import Table
 
-__all__ = ["ControlState", "ModelRecord", "Repository", "RunSpec"]
+__all__ = ["ControlState", "ModelRecord", "Repository", "RunProgress", "RunSpec"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +38,10 @@ class ControlState:
     active_experiment_run_id: int | None
     active_model_version_id: int | None
     desired_model_version_id: int | None
+    #: The run the consumer currently holds a streaming query for; ``None``
+    #: when it holds none. What the consumer *is doing*, as opposed to
+    #: ``is_active``, which is what it has been asked to do.
+    consumer_query_run_id: int | None = None
 
     @property
     def model_swap_pending(self) -> bool:
@@ -78,6 +82,26 @@ class RunSpec:
     rate_msgs_per_sec: float
     drift_schedule: list[dict[str, Any]]
     dataset_split: str
+
+
+@dataclass(frozen=True, slots=True)
+class RunProgress:
+    """One poll of a run, as the matrix runner sees it.
+
+    ``classified`` is summed from ``batch_metric``, which the consumer writes
+    *after* the messages of that batch are committed -- so reaching
+    ``total_messages`` means every row is in the sink, not merely received.
+    """
+
+    status: str
+    classified: int
+    last_batch_id: int | None
+    active_jobs: int
+    is_active: bool
+    producer_active: bool
+    active_experiment_run_id: int | None
+    consumer_query_run_id: int | None
+    last_error: str
 
 
 class Repository:
@@ -151,7 +175,8 @@ class Repository:
             cur.execute(
                 f"""
                 SELECT is_active, producer_active, active_experiment_run_id,
-                       active_model_version_id, desired_model_version_id
+                       active_model_version_id, desired_model_version_id,
+                       consumer_query_run_id
                 FROM {Table.STREAM_STATUS} WHERE id = 1
                 """
             )
@@ -225,6 +250,24 @@ class Repository:
                 WHERE id = 1
                 """,
                 (last_batch_id,),
+            )
+
+    def set_consumer_query(self, run_id: int | None) -> None:
+        """Record which run the consumer has a live streaming query for.
+
+        ``is_active`` is what the operator wants; this is what the consumer is
+        doing. NULL means no query. The matrix runner waits on it before
+        touching the active model, because a query holds its model until it has
+        actually stopped.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.STREAM_STATUS}
+                SET consumer_query_run_id = %s, consumer_heartbeat_at = now()
+                WHERE id = 1
+                """,
+                (run_id,),
             )
 
     # --- model registry -----------------------------------------------------
@@ -351,6 +394,7 @@ class Repository:
         min_delta: float = 0.0,
         run_id: int | None = None,
         since_batch: int | None = None,
+        force: bool = False,
     ) -> bool:
         """Make ``model_id`` the active version, if it is not clearly worse.
 
@@ -365,6 +409,11 @@ class Repository:
         drift: that set still encodes the pre-drift labelling, so a correctly
         adapted model scores *worse* on it and would be rejected every time,
         making adaptation structurally impossible.
+
+        ``force`` skips the guard but still retires the incumbent. It is for
+        resetting to the base model between experiment cells: that is not a
+        promotion, and the guard would rightly refuse it -- the retrained
+        incumbent usually *is* better on recent data.
 
         Retire-then-activate happens in one transaction because
         ``only_one_active_model_version`` is a real constraint.
@@ -392,11 +441,12 @@ class Repository:
             incumbent = cur.fetchone()
 
             if incumbent is not None and incumbent["id"] != model_id:
-                new_score, old_score = self._comparable_scores(
-                    candidate, incumbent, run_id=run_id, since_batch=since_batch
-                )
-                if new_score < old_score - min_delta:
-                    return False
+                if not force:
+                    new_score, old_score = self._comparable_scores(
+                        candidate, incumbent, run_id=run_id, since_batch=since_batch
+                    )
+                    if new_score < old_score - min_delta:
+                        return False
                 cur.execute(
                     f"UPDATE {Table.MODEL_VERSION} SET status = 'retired' WHERE id = %s",
                     (incumbent["id"],),
@@ -689,3 +739,175 @@ class Repository:
                 f"UPDATE {Table.STREAM_STATUS} SET producer_active = %s WHERE id = 1",
                 (active,),
             )
+
+    # --- experiment matrix --------------------------------------------------
+    # What the unattended runner needs and the dashboard does through Django:
+    # write the knobs, create a run, point the control plane at it, and watch
+    # it finish. Kept here so the runner has no Django and no HTTP dependency.
+
+    def update_config(self, **fields: Any) -> None:
+        """Overwrite ``stream_config`` knobs by column name.
+
+        The allowlist is the table itself, so a knob added to the Django model
+        is writable here without a code change. An unknown name raises rather
+        than being skipped: an ablation whose override silently did nothing
+        would be indistinguishable from a null result.
+        """
+        if not fields:
+            return
+        allowed = set(self.read_config()) - {"id", "updated_at"}
+        unknown = sorted(set(fields) - allowed)
+        if unknown:
+            raise ValueError(f"unknown {Table.STREAM_CONFIG} columns: {', '.join(unknown)}")
+        columns = list(fields)
+        assignments = ", ".join(f"{c} = %s" for c in columns)
+        values = [
+            Json(fields[c]) if isinstance(fields[c], list | dict) else fields[c] for c in columns
+        ]
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.STREAM_CONFIG} SET {assignments}, updated_at = now()
+                WHERE id = 1
+                """,
+                tuple(values),
+            )
+
+    def create_run(
+        self,
+        *,
+        name: str,
+        scenario: str,
+        seed: int,
+        mode: str,
+        adaptation_enabled: bool,
+        total_messages: int,
+        drift_schedule: list[dict[str, Any]],
+        dataset_split: str,
+        base_model_version_id: int | None,
+        consumer_config: dict[str, Any],
+        producer_config: dict[str, Any],
+        git_commit: str,
+        notes: str = "",
+        rate_msgs_per_sec: float = 50.0,
+        topic_for_run: Callable[[int], str] | None = None,
+    ) -> int:
+        """Insert a ``draft`` run and return its id.
+
+        The run's Kafka topic is named after the id, which does not exist
+        until the INSERT returns, so it is merged into ``consumer_config`` in
+        the same transaction: a run row either records its topic or does not
+        exist.
+        """
+        with self.transaction() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {Table.EXPERIMENT_RUN}
+                    (name, notes, scenario, seed, mode, status, adaptation_enabled,
+                     total_messages, rate_msgs_per_sec, drift_schedule, dataset_split,
+                     base_model_version_id, producer_config, consumer_config, git_commit,
+                     created_at)
+                VALUES (%s, %s, %s, %s, %s, 'draft', %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                RETURNING id
+                """,
+                (
+                    name, notes, scenario, seed, mode, adaptation_enabled,
+                    total_messages, rate_msgs_per_sec, Json(drift_schedule), dataset_split,
+                    base_model_version_id, Json(producer_config), Json(consumer_config),
+                    git_commit,
+                ),
+            )
+            run_id = int(cur.fetchone()["id"])
+            if topic_for_run is not None:
+                cur.execute(
+                    f"""
+                    UPDATE {Table.EXPERIMENT_RUN}
+                    SET consumer_config = consumer_config || %s::jsonb WHERE id = %s
+                    """,
+                    (Json({"topic": topic_for_run(run_id)}), run_id),
+                )
+        return run_id
+
+    def find_runs_by_name(self, name: str) -> list[dict[str, Any]]:
+        """Every run with this name, oldest first. Names are not unique: a
+        redone matrix cell is a new row with the same name."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT id, name, scenario, seed, status, adaptation_enabled, total_messages,
+                       base_model_version_id, consumer_config, git_commit, created_at
+                FROM {Table.EXPERIMENT_RUN} WHERE name = %s ORDER BY id
+                """,
+                (name,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+    def activate_run(self, run_id: int, *, producer: bool, consumer: bool) -> None:
+        """Point the control plane at ``run_id`` -- what the dashboard's
+        activate endpoint does. ``last_error`` is cleared so a stale failure
+        from an earlier run cannot be read as this one's."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"SELECT 1 FROM {Table.EXPERIMENT_RUN} WHERE id = %s", (run_id,)
+            )
+            if cur.fetchone() is None:
+                raise LookupError(f"experiment run {run_id} not found")
+            cur.execute(
+                f"""
+                UPDATE {Table.STREAM_STATUS}
+                SET active_experiment_run_id = %s, producer_active = %s, is_active = %s,
+                    last_error = ''
+                WHERE id = 1
+                """,
+                (run_id, producer, consumer),
+            )
+
+    def heartbeat_ages(self) -> dict[str, float | None]:
+        """Seconds since each service last checked in; ``None`` if it never
+        has. Both services heartbeat while idle, so a stale value means the
+        container is not running, not merely that nothing is happening."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT extract(epoch FROM now() - producer_heartbeat_at) AS producer,
+                       extract(epoch FROM now() - consumer_heartbeat_at) AS consumer
+                FROM {Table.STREAM_STATUS} WHERE id = 1
+                """
+            )
+            row = cur.fetchone()
+        if row is None:
+            raise RuntimeError(f"{Table.STREAM_STATUS} has no row with id=1")
+        return {k: (float(v) if v is not None else None) for k, v in row.items()}
+
+    def run_progress(self, run_id: int) -> RunProgress:
+        """One consistent snapshot of a run and the control plane."""
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT r.status,
+                       COALESCE(m.classified, 0)::bigint AS classified,
+                       m.last_batch_id,
+                       COALESCE(j.active_jobs, 0)::int AS active_jobs,
+                       s.is_active, s.producer_active, s.active_experiment_run_id,
+                       s.consumer_query_run_id, s.last_error
+                FROM {Table.EXPERIMENT_RUN} r
+                CROSS JOIN {Table.STREAM_STATUS} s
+                LEFT JOIN (
+                    SELECT sum(n_classified) AS classified, max(batch_id) AS last_batch_id
+                    FROM {Table.BATCH_METRIC} WHERE experiment_run_id = %s
+                ) m ON true
+                LEFT JOIN (
+                    SELECT count(*) AS active_jobs FROM {Table.TRAINING_JOB}
+                    WHERE experiment_run_id = %s AND status IN ('queued', 'running')
+                ) j ON true
+                WHERE r.id = %s AND s.id = 1
+                """,
+                (run_id, run_id, run_id),
+            )
+            row = cur.fetchone()
+        if row is None:
+            raise LookupError(f"experiment run {run_id} not found")
+        data = dict(row)
+        data["classified"] = int(data["classified"])
+        data["active_jobs"] = int(data["active_jobs"])
+        return RunProgress(**data)

@@ -2,7 +2,7 @@
 
 import pytest
 
-from streamcls.corpus.schedule import DriftSchedule, uniform_weights
+from streamcls.corpus.schedule import PRESETS, DriftSchedule, preset, uniform_weights
 
 
 def test_empty_schedule_is_the_stationary_control():
@@ -139,3 +139,45 @@ def test_weights_are_normalised_not_required_to_sum_to_one():
     sched = DriftSchedule(events=[{"at": 0, "kind": "prior_shift", "params": {"weights": [3, 1, 1, 1]}}])
     assert sum(sched.state_at(1).label_weights) == pytest.approx(1.0)
     assert sched.state_at(1).label_weights[0] == pytest.approx(0.5)
+
+
+# --- named presets --------------------------------------------------------------
+@pytest.mark.parametrize("name", PRESETS)
+@pytest.mark.parametrize("total", [2_000, 16_000])
+def test_every_preset_is_a_valid_schedule_at_any_length(name, total):
+    events = preset(name, total)
+    sched = DriftSchedule(events=list(events))
+    assert all(0 < cp < total for cp in sched.change_points)
+    sched.state_at(total - 1)  # evaluates without error
+
+
+def test_presets_are_a_pure_function_of_name_and_length():
+    assert preset("concept_abrupt", 16_000) == preset("concept_abrupt", 16_000)
+    assert preset("concept_abrupt", 16_000)[0]["at"] == 8_000
+    assert preset("concept_abrupt", 2_000)[0]["at"] == 1_000
+
+
+def test_the_concept_preset_is_a_bijection():
+    """A one-way map {2: 3} gives two classes the same text pool under
+    different labels: Bayes error caps accuracy and adaptation cannot recover.
+    The README documents the swap; the CLI used to emit the one-way map."""
+    mapping = preset("concept_abrupt", 16_000)[0]["params"]["map"]
+    forward = {int(k): int(v) for k, v in mapping.items()}
+    assert forward == {2: 3, 3: 2}
+    assert sorted(forward.values()) == sorted(forward.keys())
+
+
+def test_stationary_is_the_empty_control_and_unknown_names_are_rejected():
+    assert preset("stationary", 16_000) == []
+    with pytest.raises(ValueError, match="unknown scenario"):
+        preset("apocalypse", 16_000)
+
+
+def test_the_cli_choices_and_the_presets_agree():
+    """The CLI's argparse choices and the runner's scenario names are the same
+    tuple, so a scenario cannot exist in one and not the other."""
+    from streamcls.corpus.__main__ import main
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["schedule", "not-a-preset"])
+    assert excinfo.value.code == 2
