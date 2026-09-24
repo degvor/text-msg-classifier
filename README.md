@@ -14,13 +14,16 @@ are measured against known change points.
 ## Quick start
 
 ```bash
+make install        # uv venv + dev extras (host-side CLI, tests)
 make env            # write .env from .env.example
 make data           # download AG News (~31 MB, checksum-verified)
-make up             # db, kafka (KRaft), web, producer, consumer
+make up             # db, kafka (KRaft), web, producer, consumer, trainer-worker
 make train PROMOTE=1  # train the initial model and activate it
 open http://localhost:8000
 ```
 
+`make up` builds whatever image is missing, including the shared Spark base
+image the consumer and trainer build `FROM`; `make build` rebuilds all of them.
 `make help` lists everything.
 
 ---
@@ -78,7 +81,10 @@ Every cross-service contract is a Postgres table. There is no shared-file bus.
 
 An experiment is one `ExperimentRun` row: a seed, a message count, and a drift
 schedule. Same seed → byte-identical stream, which is what makes two runs
-comparable.
+comparable. Each run consumes its own Kafka topic, `posts.run-<id>`, so batch
+ids start at 0 for every run and no volume reset is needed between them.
+
+### One run by hand
 
 ```bash
 # A drift schedule to paste into a run
@@ -101,6 +107,63 @@ make compare BASELINE=1 ADAPTIVE=2 # the A/B figure
  run  name                             seed  adapt batches     acc     pre    post  delay  FA miss  recov retrain
    6  adaptive recovery            20260827     on      32   65.2%   90.0%   59.5%    0.0   0    0      —       1
 ```
+
+### The matrix
+
+The thesis numbers come from `experiments/matrix.toml`: 5 scenarios × 3 seeds
+× 2 arms, plus 4 ablations on two scenarios — 54 cells, about 6.5 hours. The
+runner performs every cell identically and unattended:
+
+```bash
+make matrix SPEC=experiments/smoke.toml ARGS=--dry-run   # the cell table and an estimate; touches nothing
+make matrix SPEC=experiments/smoke.toml                  # 2 cells, ~5 min: proves the lifecycle end to end
+make matrix                                              # the real one; leave it overnight
+make report                                              # results/thesis-v1/summary.md, summary.csv, pairs.csv, detectors.csv
+```
+
+Per cell the runner stops both services and waits for the consumer to release
+its query, writes the spec's `[config]` block into `stream_config`, re-activates
+the base model, creates the run and its topic, lets the producer write the whole
+stream, *then* starts the consumer against the complete backlog — so every batch
+is exactly `max_offsets_per_trigger` rows and batch composition is a pure
+function of message index. The cell is done when every message is classified
+and no retrain is queued or running; it is then scored and one JSON line is
+appended to `results/<name>/runs.jsonl`.
+
+A spec is TOML:
+
+| Block | What |
+|---|---|
+| `[matrix]` | `name`, `seeds`, `arms ⊆ {baseline, adaptive}` |
+| `[defaults]` | `total_messages`, `mode`, `dataset_split`, `timeout_minutes`, `base_model` (`"active"` or a version id, resolved once and pinned for every cell) |
+| `[config]` | the full `stream_config` every cell runs with; written before each cell so the matrix is reproducible from the file plus the commit it records |
+| `[scenarios.<preset>]` | a preset from `streamcls.corpus.schedule`, or an explicit `schedule = [...]` |
+| `[[ablations]]` | `name`, `scenarios`, `config` overrides; adaptive arm only |
+
+`trigger_seconds` is pinned in `[config]` on purpose: detection delay, recovery
+and swap latency are all measured in batches, and how many batches a retrain
+spans depends on how fast batches arrive. Halving it halves the wall clock and
+changes those numbers.
+
+Things to know while it runs:
+
+- **The ledger is the state.** `runs.jsonl` is append-only and one line per
+  attempt; a cell whose last line says `completed` is skipped on re-run, so a
+  crash or Ctrl-C (which stops the stream, marks the run `aborted`, records the
+  cell and exits 130) is resumed by running the same command again. To redo a
+  cell, delete its line or pass `ARGS="--only 'concept_abrupt/*'"`. `make report`
+  takes the last line per cell.
+- **The runner owns the stream flags.** Do not toggle the producer or consumer
+  from the dashboard during a matrix; a dropped consumer flag is exactly what
+  the consumer's own surrender looks like, so the cell is recorded as failed.
+- **Never `make down` mid-matrix** — it is `docker compose down -v` and drops
+  Postgres. `docker compose stop` / `docker compose start` keeps everything.
+- `make matrix`, `make score` and `make compare` run on the host and reach the
+  stack through the ports `docker-compose.override.yml` publishes
+  (`HOST_ENV` in the Makefile); the services inside Docker keep using `db` and
+  `kafka`.
+- Retrains inside a run use the trainer's default seed and algorithm, not the
+  run's — a known limitation, recorded as such.
 
 ### Drift scenarios
 
