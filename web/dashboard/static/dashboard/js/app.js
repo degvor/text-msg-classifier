@@ -344,6 +344,7 @@ async function renderRuns() {
   fillTable("runs-table", runs, (r) => [
     el("td", { text: r.id, cls: "num" }),
     el("td", { text: r.name }),
+    el("td", { text: r.scenario || "—" }),
     el("td", { text: r.seed, cls: "num" }),
     el("td", { text: r.adaptation_enabled ? "on" : "off",
       cls: r.adaptation_enabled ? "pill pill-ok" : "pill" }),
@@ -415,7 +416,13 @@ function wireActions() {
     const form = document.getElementById("config-form");
     const body = {};
     for (const field of form.querySelectorAll("input[name]")) {
-      body[field.name] = field.type === "checkbox" ? field.checked : field.value;
+      if (field.dataset.multi !== undefined) {
+        // A checkbox group posts as a list of the checked values.
+        body[field.name] = body[field.name] || [];
+        if (field.checked) body[field.name].push(field.value);
+      } else {
+        body[field.name] = field.type === "checkbox" ? field.checked : field.value;
+      }
     }
     try {
       await api("/api/config/", { method: "POST", body });

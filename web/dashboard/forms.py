@@ -11,10 +11,19 @@ from __future__ import annotations
 
 from django import forms
 
-from dashboard.models import Category, ExperimentRun, StreamConfig
+from dashboard.models import Category, Detector, ExperimentRun, StreamConfig
 
 
 class StreamConfigForm(forms.ModelForm):
+    # Declared explicitly: a JSONField's default form field is a free-text JSON
+    # box, and this one must be a subset of the known detector names.
+    actionable_detectors = forms.MultipleChoiceField(
+        choices=Detector.choices,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text=StreamConfig._meta.get_field("actionable_detectors").help_text,
+    )
+
     class Meta:
         model = StreamConfig
         fields = [
@@ -33,7 +42,14 @@ class StreamConfigForm(forms.ModelForm):
             "retrain_window_rows",
             "retrain_base_rows",
             "retrain_min_new_rows",
+            "actionable_detectors",
         ]
+
+    def clean_actionable_detectors(self) -> list[str]:
+        # MultipleChoiceField already rejects unknown names; store in the
+        # canonical order so two configs with the same set compare equal.
+        chosen = set(self.cleaned_data["actionable_detectors"])
+        return [d for d in Detector.values if d in chosen]
 
     def clean_adwin_delta(self) -> float:
         value = self.cleaned_data["adwin_delta"]

@@ -18,6 +18,7 @@ from dashboard.models import (
     ModelStatus,
     ModelVersion,
     RunStatus,
+    StreamConfig,
     StreamStatus,
 )
 
@@ -89,6 +90,7 @@ def test_ab_clone_copies_the_seed_and_schedule_but_flips_adaptation(staff_client
     attributable to adaptation alone. That is the headline figure."""
     run = ExperimentRun.objects.create(
         name="drift A",
+        scenario="concept_abrupt",
         seed=1234,
         adaptation_enabled=True,
         drift_schedule=[{"at": 4000, "kind": "concept_abrupt"}],
@@ -105,7 +107,28 @@ def test_ab_clone_copies_the_seed_and_schedule_but_flips_adaptation(staff_client
 
     clone = ExperimentRun.objects.exclude(pk=run.pk).get()
     assert clone.seed == run.seed
+    assert clone.scenario == run.scenario
     assert clone.drift_schedule == run.drift_schedule
     assert clone.total_messages == run.total_messages
     assert clone.adaptation_enabled is False
     assert clone.status == RunStatus.DRAFT
+
+
+def test_experiment_run_changelist_filters_by_scenario(staff_client):
+    ExperimentRun.objects.create(name="matrix cell", seed=7, scenario="prior_shift")
+    ExperimentRun.objects.create(name="other cell", seed=8, scenario="stationary")
+    url = reverse("admin:dashboard_experimentrun_changelist")
+    response = staff_client.get(url, {"scenario": "prior_shift"})
+    assert response.status_code == 200
+    assert b"matrix cell" in response.content
+    assert b"other cell" not in response.content
+
+
+def test_stream_config_form_offers_the_detector_choices(staff_client):
+    """A wrong field name in a fieldset only fails when the change form renders."""
+    config = StreamConfig.load()
+    url = reverse("admin:dashboard_streamconfig_change", args=[config.pk])
+    response = staff_client.get(url)
+    assert response.status_code == 200
+    assert b"actionable_detectors" in response.content
+    assert b"retrain_min_new_rows" in response.content

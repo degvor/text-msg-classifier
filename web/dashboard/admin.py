@@ -80,6 +80,8 @@ class StreamConfigAdmin(SingletonAdmin):
                     "max_retrains_per_run",
                     "retrain_window_rows",
                     "retrain_base_rows",
+                    "retrain_min_new_rows",
+                    "actionable_detectors",
                     "label_delay_batches",
                 )
             },
@@ -95,6 +97,7 @@ class StreamStatusAdmin(SingletonAdmin):
         "consumer_heartbeat_at",
         "producer_heartbeat_at",
         "last_batch_id",
+        "consumer_query_run_id",
         "last_error",
         "updated_at",
     )
@@ -102,9 +105,18 @@ class StreamStatusAdmin(SingletonAdmin):
 
 @admin.register(ExperimentRun)
 class ExperimentRunAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "seed", "mode", "adaptation_enabled", "status", "total_messages")
-    list_filter = ("status", "mode", "adaptation_enabled")
-    search_fields = ("name", "notes")
+    list_display = (
+        "id",
+        "name",
+        "scenario",
+        "seed",
+        "mode",
+        "adaptation_enabled",
+        "status",
+        "total_messages",
+    )
+    list_filter = ("status", "scenario", "mode", "adaptation_enabled")
+    search_fields = ("name", "notes", "scenario")
     readonly_fields = ("created_at", "started_at", "ended_at", "git_commit")
     actions = ("clone_with_adaptation_disabled",)
 
@@ -122,6 +134,7 @@ class ExperimentRunAdmin(admin.ModelAdmin):
             ExperimentRun.objects.create(
                 name=f"{run.name} (no adaptation)",
                 notes=f"A/B counterpart of run #{run.pk}. Same seed and drift schedule.",
+                scenario=run.scenario,
                 seed=run.seed,
                 mode=run.mode,
                 status=RunStatus.DRAFT,

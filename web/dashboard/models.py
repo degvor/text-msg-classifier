@@ -11,8 +11,8 @@ Three conventions matter to code outside Django:
   needs a database-level ``db_default=``. Django applies ``default=`` in Python,
   so a psycopg2 INSERT that omits the column hits a NOT NULL violation instead.
   ``batch_metric``, ``classified_message``, ``drift_event``, ``training_job``,
-  ``model_version`` and ``stream_status`` are all written this way;
-
+  ``model_version``, ``stream_status`` and (by the matrix runner)
+  ``experiment_run`` are all written this way;
 
 * every model pins ``Meta.db_table`` from :class:`streamcls.db.tables.Table`,
   because the Spark and psycopg2 paths address these tables by name and must
@@ -24,6 +24,7 @@ Three conventions matter to code outside Django:
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import F, Q, Value
@@ -34,6 +35,21 @@ HEX_COLOR = RegexValidator(
     r"^#[0-9a-fA-F]{6}$",
     "Must be a 6-digit hex colour such as #1f77b4.",
 )
+
+
+def default_actionable_detectors() -> list[str]:
+    """Mirror of ``streamcls.drift.monitor.DEFAULT_ACTIONABLE``: error-rate ADWIN
+    is the only detector trusted to trigger a retrain by default."""
+    return ["adwin_error"]
+
+
+def validate_detector_list(value) -> None:
+    """``actionable_detectors`` must be a list drawn from :class:`Detector`."""
+    if not isinstance(value, list):
+        raise ValidationError("Must be a list of detector names.")
+    unknown = sorted(set(value) - set(Detector.values))
+    if unknown:
+        raise ValidationError(f"Unknown detectors: {', '.join(unknown)}.")
 
 
 # ---------------------------------------------------------------------------
@@ -91,35 +107,60 @@ class ExperimentRun(models.Model):
 
     Every fact the thesis reports is grouped by a run, and the headline figure
     is two runs with the same ``seed`` differing only in ``adaptation_enabled``.
+
+    Rows are inserted by the matrix runner over psycopg2 as well as by Django,
+    so every defaulted field carries a ``db_default`` (see the module docstring).
     """
 
     name = models.CharField(max_length=120)
-    notes = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="", db_default="")
+
+    #: Which named drift scenario produced ``drift_schedule``; the grouping key
+    #: for the results matrix. Free text so ad-hoc runs can leave it blank.
+    scenario = models.CharField(max_length=64, blank=True, default="", db_default="")
 
     seed = models.IntegerField(
         help_text="Same seed + same drift_schedule reproduces the stream exactly."
     )
-    mode = models.CharField(max_length=16, choices=StreamMode, default=StreamMode.REPLAY)
-    status = models.CharField(max_length=16, choices=RunStatus, default=RunStatus.DRAFT)
+    mode = models.CharField(
+        max_length=16, choices=StreamMode, default=StreamMode.REPLAY, db_default=StreamMode.REPLAY
+    )
+    status = models.CharField(
+        max_length=16, choices=RunStatus, default=RunStatus.DRAFT, db_default=RunStatus.DRAFT
+    )
 
     #: The A/B switch behind the central figure.
-    adaptation_enabled = models.BooleanField(default=True)
+    adaptation_enabled = models.BooleanField(default=True, db_default=True)
 
-    total_messages = models.IntegerField(default=20_000, validators=[MinValueValidator(1)])
-    rate_msgs_per_sec = models.FloatField(default=50.0, help_text="Ignored in replay mode.")
+    total_messages = models.IntegerField(
+        default=20_000, validators=[MinValueValidator(1)], db_default=20_000
+    )
+    rate_msgs_per_sec = models.FloatField(
+        default=50.0, help_text="Ignored in replay mode.", db_default=50.0
+    )
 
     #: ``[{"at": 4000, "kind": "concept_abrupt", "params": {...}}, ...]``
     #: Also the ground truth for detection delay and false-alarm rate.
-    drift_schedule = models.JSONField(default=list, blank=True)
+    drift_schedule = models.JSONField(
+        default=list, blank=True, db_default=Value([], models.JSONField())
+    )
 
-    dataset_split = models.CharField(max_length=64, default="agnews-stream-holdout-v1")
+    dataset_split = models.CharField(
+        max_length=64, default="agnews-stream-holdout-v1", db_default="agnews-stream-holdout-v1"
+    )
     base_model_version = models.ForeignKey(
         "ModelVersion", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
 
-    producer_config = models.JSONField(default=dict, blank=True)
-    consumer_config = models.JSONField(default=dict, blank=True)
-    git_commit = models.CharField(max_length=40, blank=True, default="")
+    producer_config = models.JSONField(
+        default=dict, blank=True, db_default=Value({}, models.JSONField())
+    )
+    #: The matrix runner snapshots the whole ``StreamConfig`` row plus the cell
+    #: identity here, so a run's knobs survive later edits to the singleton.
+    consumer_config = models.JSONField(
+        default=dict, blank=True, db_default=Value({}, models.JSONField())
+    )
+    git_commit = models.CharField(max_length=40, blank=True, default="", db_default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -222,6 +263,15 @@ class StreamConfig(SingletonModel):
         validators=[MinValueValidator(0)],
         help_text="Labels for batch b become visible at b+D. Models delayed feedback.",
     )
+    #: Which detectors may trigger a retrain. Every detector always records its
+    #: signals as drift events; this decides which of them are acted on. An
+    #: experiment variable, so it lives here rather than in a module constant.
+    actionable_detectors = models.JSONField(
+        default=default_actionable_detectors,
+        db_default=Value(["adwin_error"], models.JSONField()),
+        validators=[validate_detector_list],
+        help_text="Detectors whose signals trigger a retrain; the rest are recorded only.",
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -254,6 +304,11 @@ class StreamStatus(SingletonModel):
     consumer_heartbeat_at = models.DateTimeField(null=True, blank=True)
     producer_heartbeat_at = models.DateTimeField(null=True, blank=True)
     last_batch_id = models.BigIntegerField(null=True, blank=True)
+    #: The run the consumer currently has a live streaming query for; NULL when
+    #: no query is running. ``is_active`` is what the operator *wants*; this is
+    #: what the consumer *is doing*, and the only reliable "query has stopped"
+    #: signal -- heartbeats alone cannot distinguish idle from mid-batch.
+    consumer_query_run_id = models.BigIntegerField(null=True, blank=True)
     last_error = models.TextField(blank=True, default="", db_default="")
 
     updated_at = models.DateTimeField(auto_now=True)

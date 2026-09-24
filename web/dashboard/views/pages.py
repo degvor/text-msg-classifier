@@ -10,7 +10,7 @@ from __future__ import annotations
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from dashboard.models import Category, ExperimentRun, StreamConfig, StreamStatus
+from dashboard.models import Category, Detector, ExperimentRun, StreamConfig, StreamStatus
 
 NAV = (
     ("dashboard:overview", "Overview"),
@@ -52,6 +52,11 @@ def runs(request: HttpRequest) -> HttpResponse:
 
 def settings(request: HttpRequest) -> HttpResponse:
     context = _base(request, "dashboard:settings")
-    context["config"] = StreamConfig.load()
+    config = StreamConfig.load()
+    context["config"] = config
+    context["detectors"] = [
+        {"value": value, "label": label, "checked": value in (config.actionable_detectors or [])}
+        for value, label in Detector.choices
+    ]
     context["categories"] = Category.objects.all()
     return render(request, "dashboard/settings.html", context)

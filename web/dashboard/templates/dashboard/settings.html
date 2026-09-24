@@ -26,6 +26,12 @@
         <label class="check"><input type="checkbox" name="adaptation_enabled" {% if config.adaptation_enabled %}checked{% endif %}> Adaptation enabled</label>
         <label class="check"><input type="checkbox" name="auto_promote" {% if config.auto_promote %}checked{% endif %}> Auto-promote</label>
       </div>
+      <fieldset class="check-group">
+        <legend>Actionable detectors <span class="hint">Every detector is recorded; only these trigger a retrain.</span></legend>
+        {% for d in detectors %}
+        <label class="check"><input type="checkbox" name="actionable_detectors" data-multi value="{{ d.value }}" {% if d.checked %}checked{% endif %}> {{ d.label }}</label>
+        {% endfor %}
+      </fieldset>
       <button type="button" class="btn btn-primary" id="save-config" {% if not user.is_staff %}disabled{% endif %}>Save</button>
     </form>
   </section>

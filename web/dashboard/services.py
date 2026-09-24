@@ -112,6 +112,7 @@ def _run_summary(run: ExperimentRun) -> dict[str, Any]:
     return {
         "id": run.pk,
         "name": run.name,
+        "scenario": run.scenario,
         "seed": run.seed,
         "mode": run.mode,
         "status": run.status,

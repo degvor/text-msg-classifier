@@ -145,6 +145,10 @@ input, select {
 }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .form-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 14px; }
+.check-group { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px 10px; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.check-group legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+.check-group legend .hint { display: inline; margin-left: 6px; }
+.check-group .check { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--text); }
 .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 
 /* --- charts --------------------------------------------------------------- */

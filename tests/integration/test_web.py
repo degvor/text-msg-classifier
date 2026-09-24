@@ -257,20 +257,61 @@ def test_malformed_json_is_a_400_not_a_500(staff):
     assert response.status_code == 400
 
 
+CONFIG_PAYLOAD = {
+    "max_message_length": 1234, "max_offsets_per_trigger": 250, "trigger_seconds": 7,
+    "adwin_delta": 0.005, "psi_threshold": 0.3, "psi_consecutive_batches": 2,
+    "grace_batches": 4, "promote_min_delta": 0.02, "min_batches_between_retrains": 6,
+    "max_retrains_per_run": 5, "retrain_window_rows": 100, "retrain_base_rows": 50,
+    "retrain_min_new_rows": 10, "adaptation_enabled": True, "auto_promote": False,
+    "actionable_detectors": ["ddm", "adwin_error"],
+}
+
+
 def test_config_round_trips_through_validation(staff):
-    payload = {
-        "max_message_length": 1234, "max_offsets_per_trigger": 250, "trigger_seconds": 7,
-        "adwin_delta": 0.005, "psi_threshold": 0.3, "psi_consecutive_batches": 2,
-        "grace_batches": 4, "promote_min_delta": 0.02, "min_batches_between_retrains": 6,
-        "max_retrains_per_run": 5, "retrain_window_rows": 100, "retrain_base_rows": 50,
-        "retrain_min_new_rows": 10, "adaptation_enabled": True, "auto_promote": False,
-    }
     assert staff.post(
-        reverse("dashboard:api_update_config"), data=payload, content_type="application/json"
+        reverse("dashboard:api_update_config"), data=CONFIG_PAYLOAD,
+        content_type="application/json",
     ).json()["ok"]
     config = StreamConfig.load()
     assert config.max_message_length == 1234
     assert config.auto_promote is False
+    assert config.actionable_detectors == ["ddm", "adwin_error"]
+
+
+def test_actionable_detectors_are_stored_in_canonical_order(staff):
+    payload = {**CONFIG_PAYLOAD, "actionable_detectors": ["psi_vocabulary", "ddm"]}
+    assert staff.post(
+        reverse("dashboard:api_update_config"), data=payload, content_type="application/json"
+    ).json()["ok"]
+    assert StreamConfig.load().actionable_detectors == ["ddm", "psi_vocabulary"]
+
+
+def test_an_unknown_detector_is_rejected(staff):
+    payload = {**CONFIG_PAYLOAD, "actionable_detectors": ["adwin_error", "oracle"]}
+    response = staff.post(
+        reverse("dashboard:api_update_config"), data=payload, content_type="application/json"
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["ok"] is False
+    assert "actionable_detectors" in body["details"]
+    assert StreamConfig.load().actionable_detectors == ["adwin_error"]
+
+
+def test_settings_page_reflects_the_saved_detector_set(staff):
+    config = StreamConfig.load()
+    config.actionable_detectors = ["ddm"]
+    config.save()
+    html = staff.get(reverse("dashboard:settings")).content.decode()
+    assert 'name="actionable_detectors" data-multi value="ddm" checked' in html
+    assert 'name="actionable_detectors" data-multi value="adwin_error" >' in html
+
+
+def test_runs_carry_their_scenario(client, run):
+    run.scenario = "concept_abrupt"
+    run.save()
+    rows = client.get(reverse("dashboard:api_runs")).json()["data"]
+    assert rows[0]["scenario"] == "concept_abrupt"
 
 
 def test_an_invalid_drift_schedule_is_rejected_before_the_run_starts(staff):
