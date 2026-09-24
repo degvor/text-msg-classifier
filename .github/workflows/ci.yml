@@ -82,10 +82,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: build every image
+        # consumer and trainer build FROM the spark image, so it goes first and
+        # its CI tag is passed through the build arg.
         run: |
-          docker build -f docker/spark.Dockerfile   -t streamcls/spark:ci .
+          docker build -f docker/spark.Dockerfile    -t streamcls/spark:ci .
           docker build -f docker/producer.Dockerfile -t streamcls/producer:ci .
           docker build -f docker/web.Dockerfile      -t streamcls/web:ci .
+          docker build -f docker/consumer.Dockerfile -t streamcls/consumer:ci \
+            --build-arg SPARK_BASE_IMAGE=streamcls/spark:ci .
+          docker build -f docker/trainer.Dockerfile  -t streamcls/trainer:ci \
+            --build-arg SPARK_BASE_IMAGE=streamcls/spark:ci .
       - name: spark image is self-contained
         # Proves the jars are baked in: no Ivy resolution, no network.
         run: |

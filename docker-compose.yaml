@@ -74,7 +74,12 @@ services:
   # The previous project claimed a distributed pipeline while setting no
   # .master() at all and launching the consumer with plain `python3` rather than
   # spark-submit -- so it ran local[*] in one JVM.
+  #
+  # `image:` names the tag that consumer and trainer build FROM. Compose does
+  # not order builds by FROM and skips profiled services in `compose build`, so
+  # the Makefile builds this image first (`make spark-image`).
   spark-master:
+    image: streamcls/spark:dev
     build:
       context: .
       dockerfile: docker/spark.Dockerfile
@@ -102,9 +107,7 @@ services:
       start_period: 20s
 
   spark-worker:
-    build:
-      context: .
-      dockerfile: docker/spark.Dockerfile
+    image: streamcls/spark:dev
     profiles: [cluster]
     command:
       - spark-class
