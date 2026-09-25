@@ -481,6 +481,7 @@ def result_row(
     score: Any = None,
     error: str = "",
     git_commit: str = "",
+    git_dirty: bool = False,
 ) -> dict[str, Any]:
     """One ledger line. ``status == "completed"`` is the only value the
     resume logic trusts; everything else is diagnostic."""
@@ -498,6 +499,7 @@ def result_row(
         "total_messages": cell.total_messages,
         "config": dict(cell.config),
         "git_commit": git_commit,
+        "git_dirty": git_dirty,
         "started_at": started_at.isoformat(),
         "ended_at": ended_at.isoformat(),
         "wall_s": round((ended_at - started_at).total_seconds(), 1),
@@ -907,6 +909,7 @@ class MatrixRunner:
             ended_at=self._now(),
             score=score,
             git_commit=self._git_commit,
+            git_dirty=self._git_dirty,
         )
 
     def _failed_row(
@@ -921,6 +924,7 @@ class MatrixRunner:
             ended_at=self._now(),
             error=error,
             git_commit=self._git_commit,
+            git_dirty=self._git_dirty,
         )
 
     def _interrupted(self, ledger: Path, base_id: int) -> None:

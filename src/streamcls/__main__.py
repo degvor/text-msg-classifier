@@ -158,7 +158,7 @@ def cmd_matrix(args) -> int:
         return 2
     from streamcls.kafka_admin import ensure_topic
 
-    commit, dirty = _git_state()
+    commit, dirty = _git_state(Path(args.results))
     if dirty:
         logging.getLogger("streamcls.matrix").warning(
             "working tree is dirty; the ledger records commit %s with git_dirty=true", commit[:12]
@@ -230,6 +230,7 @@ def cmd_report(args) -> int:
             f"\n\n_{len(unfinished)} cell(s) not completed: "
             + ", ".join(f"`{k}`" for k in unfinished) + "_\n"
         )
+    markdown = markdown.rstrip("\n") + f"\n\n{_provenance(completed)}\n"
     (results_dir / "summary.md").write_text(markdown, encoding="utf-8")
     print(markdown)
     print(f"\nwrote summary.md, summary.csv, pairs.csv, detectors.csv to {results_dir}/",
@@ -237,14 +238,40 @@ def cmd_report(args) -> int:
     return 0
 
 
-def _git_state() -> tuple[str, bool]:
-    """``(HEAD, dirty)`` for the ledger; empty and clean when git is unavailable."""
+def _provenance(rows: list[dict]) -> str:
+    """Which code produced these cells, as one line the thesis can cite."""
+    states = {True: "dirty working tree", False: "clean"}
+    counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        key = ((row.get("git_commit") or "unknown")[:8],
+               states.get(row.get("git_dirty"), "tree state not recorded"))
+        counts[key] = counts.get(key, 0) + 1
+    return "_Code: " + ", ".join(
+        f"`{commit}` {state} ({n} cell{'' if n == 1 else 's'})"
+        for (commit, state), n in sorted(counts.items())
+    ) + "._"
+
+
+def _git_state(results: Path) -> tuple[str, bool]:
+    """``(HEAD, dirty)`` for the ledger; empty and clean when git is unavailable.
+
+    ``results`` is left out of the dirty check: it is the matrix's own
+    output, and a resumed matrix always finds its ledger there.
+    """
     try:
         run = functools.partial(
             subprocess.run, capture_output=True, text=True, timeout=5, check=True
         )
         commit = run(["git", "rev-parse", "HEAD"]).stdout.strip()
-        dirty = bool(run(["git", "status", "--porcelain"]).stdout.strip())
+        top = Path(run(["git", "rev-parse", "--show-toplevel"]).stdout.strip()).resolve()
+        pathspec = [":/"]
+        try:
+            inside = results.resolve().relative_to(top).as_posix()
+        except ValueError:  # outside the repository: nothing to leave out
+            inside = "."
+        if inside != ".":
+            pathspec.append(f":(top,exclude){inside}")
+        dirty = bool(run(["git", "status", "--porcelain", "--", *pathspec]).stdout.strip())
     except (OSError, subprocess.SubprocessError):
         return "", False
     return commit, dirty

@@ -861,6 +861,18 @@ def test_a_leftover_checkpoint_for_a_new_run_id_fails_the_cell_before_the_produc
     assert world.topics == ["posts.run-2"], "no topic is created for the failed run"
 
 
+def test_every_ledger_row_records_whether_the_tree_was_dirty(tmp_path):
+    """The ledger is the evidence ``make report`` reads; the flag only lived
+    in Postgres before."""
+    world = FakeWorld()
+    world.existing_topics.add("posts.run-1")  # one failed row, one completed
+    spec, cells = two_cells()
+    runner(world, git_dirty=True).run(spec, cells, ledger=tmp_path / "runs.jsonl")
+
+    rows = read_ledger(tmp_path / "runs.jsonl")
+    assert [(r["status"], r["git_dirty"]) for r in rows] == [("error", True), ("completed", True)]
+
+
 def test_a_topic_that_existed_before_its_run_fails_the_cell_before_the_producer(tmp_path):
     """The Kafka side of the same collision: the producer would append a
     second copy of the stream to the leftover one."""
@@ -1167,27 +1179,30 @@ def test_cli_rejects_a_bad_spec_and_an_empty_selection(tmp_path, capsys):
     assert "no cell matches" in capsys.readouterr().err
 
 
+def scored(cell: Cell, run_id: int, post: float):
+    """A real ``RunScore`` for a 4-batch run at 0.9 accuracy, then ``post``."""
+    from streamcls.experiments import score_run
+
+    rows = [
+        {"batch_id": b, "n_received": 500, "n_classified": 500,
+         "n_correct": round((0.9 if b < 2 else post) * 500), "accuracy": 0.9 if b < 2 else post}
+        for b in range(4)
+    ]
+    return score_run(
+        run={"id": run_id, "name": cell.run_name, "seed": cell.seed,
+             "adaptation_enabled": cell.adaptation_enabled, "scenario": cell.scenario,
+             "drift_schedule": list(cell.schedule)},
+        batches=rows, events=[], jobs=[], batch_size=cell.batch_size,
+    )
+
+
 def test_cli_report_writes_the_tables_and_notes_unfinished_cells(tmp_path, capsys):
     import streamcls.__main__ as cli
-    from streamcls.experiments import score_run
     from streamcls.matrix import load_spec
 
     cells = expand(load_spec(SPECS / "smoke.toml"))
     ledger = tmp_path / "smoke" / "runs.jsonl"
     t0 = datetime(2026, 8, 30, tzinfo=UTC)
-
-    def scored(cell: Cell, run_id: int, post: float):
-        rows = [
-            {"batch_id": b, "n_received": 500, "n_classified": 500,
-             "n_correct": round((0.9 if b < 2 else post) * 500), "accuracy": 0.9 if b < 2 else post}
-            for b in range(4)
-        ]
-        return score_run(
-            run={"id": run_id, "name": cell.run_name, "seed": cell.seed,
-                 "adaptation_enabled": cell.adaptation_enabled, "scenario": cell.scenario,
-                 "drift_schedule": list(cell.schedule)},
-            batches=rows, events=[], jobs=[], batch_size=cell.batch_size,
-        )
 
     # A first attempt at the adaptive cell timed out; the re-run completed.
     append_row(ledger, result_row(cells[0], status="completed", run_id=1, base_model_version_id=1,
@@ -1213,3 +1228,54 @@ def test_cli_report_writes_the_tables_and_notes_unfinished_cells(tmp_path, capsy
     assert "1 cell(s) not completed: `concept_abrupt/baseline/seed20260827`" in capsys.readouterr().out
 
     assert cli.main(["report", str(tmp_path / "nothing")]) == 1
+
+
+def test_cli_report_states_the_commit_and_flags_a_dirty_tree(tmp_path, capsys):
+    """The report is what the thesis cites, so it says which code produced it."""
+    import streamcls.__main__ as cli
+    from streamcls.matrix import load_spec
+
+    cells = expand(load_spec(SPECS / "smoke.toml"))
+    ledger = tmp_path / "smoke" / "runs.jsonl"
+    t0 = datetime(2026, 8, 30, tzinfo=UTC)
+    for index, cell in enumerate(cells, start=1):
+        append_row(ledger, result_row(cell, status="completed", run_id=index, base_model_version_id=1,
+                                      started_at=t0, ended_at=t0, score=scored(cell, index, 0.8),
+                                      git_commit="a" * 40, git_dirty=False))
+    assert cli.main(["report", str(tmp_path / "smoke")]) == 0
+    out = capsys.readouterr().out
+    assert "a" * 8 in out
+    assert "dirty" not in out
+
+    append_row(ledger, result_row(cells[1], status="completed", run_id=3, base_model_version_id=1,
+                                  started_at=t0, ended_at=t0, score=scored(cells[1], 3, 0.8),
+                                  git_commit="a" * 40, git_dirty=True))
+    assert cli.main(["report", str(tmp_path / "smoke")]) == 0
+    assert "dirty" in capsys.readouterr().out
+
+
+def test_git_state_leaves_the_results_directory_out_of_the_dirty_check(tmp_path, monkeypatch):
+    """A resumed matrix always finds its own ledger under results/: that is
+    output, not a change to the code being measured."""
+    import subprocess
+
+    from streamcls.__main__ import _git_state
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                       cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / "code.py").write_text("x = 1\n")
+    git("add", "code.py")
+    git("commit", "-qm", "init")
+    (tmp_path / "results" / "m").mkdir(parents=True)
+    (tmp_path / "results" / "m" / "runs.jsonl").write_text("{}\n")
+    monkeypatch.chdir(tmp_path)
+
+    commit, dirty = _git_state(Path("results"))
+    assert len(commit) == 40
+    assert dirty is False
+
+    (tmp_path / "code.py").write_text("x = 2\n")
+    assert _git_state(Path("results")) == (commit, True)

@@ -153,6 +153,10 @@ Things to know while it runs:
   cell and exits 130) is resumed by running the same command again. To redo a
   cell, delete its line or pass `ARGS="--only 'concept_abrupt/*'"`. `make report`
   takes the last line per cell.
+- **Every line records the code it ran:** `git_commit`, and `git_dirty` for
+  uncommitted or untracked changes outside `results/`, which is the matrix's
+  own output. `summary.md` ends with a line naming the commit(s) and flagging a
+  dirty tree, so start the matrix from a clean one.
 - **The base model is restored on exit.** Adaptive cells promote retrained
   models; when the loop ends, finished, failed or interrupted, the runner
   re-activates the base, so the next `base_model = "active"` resolves to the
