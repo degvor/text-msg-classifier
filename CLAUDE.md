@@ -16,6 +16,9 @@ make up                # db, kafka, web, producer, consumer
 make train PROMOTE=1   # train and activate a model
 make score             # results table
 make compare BASELINE=1 ADAPTIVE=2
+make matrix SPEC=experiments/smoke.toml ARGS=--dry-run   # cell table, no writes
+make matrix            # experiments/matrix.toml, resumable, ~6.5 h
+make report NAME=smoke # results/<NAME>/runs.jsonl -> summary.md + CSVs, no DB
 
 make test-unit         # no JVM, no DB, no Docker
 make test-integration  # needs db + kafka up
@@ -25,14 +28,18 @@ make lint
 
 Run a single test: `.venv/bin/python -m pytest tests/unit/test_detectors.py::test_matches_river -q`.
 Integration tests need `--ds=config.settings.dev` and `POSTGRES_HOST=localhost
-POSTGRES_PORT=55432` (the dev override publishes Postgres there).
+POSTGRES_PORT=55432` (the dev override publishes Postgres there). `make
+score/compare/matrix` run on the host and get the same override from
+`HOST_ENV` in the Makefile.
 
 ## Constraints that shape everything
 
 **There is no JRE on the dev machine.** Anything importing pyspark runs in
-Docker. This is why `streamcls.drift`, `streamcls.corpus`, `streamcls.metrics`
-and `streamcls.experiments` are pure Python with no Spark dependency — they hold
-the logic the thesis actually reports on, and they must be testable locally.
+Docker. This is why `streamcls.drift`, `streamcls.corpus`, `streamcls.metrics`,
+`streamcls.experiments` and `streamcls.matrix` are pure Python with no Spark
+dependency — they hold the logic the thesis actually reports on, and they must
+be testable locally (the runner is exercised against a scripted fake world in
+`tests/unit/test_matrix.py`).
 `streamcls.spark.*` is the only place pyspark may be imported, and never at
 `streamcls/__init__` level (the Django image installs `streamcls[web]` and must
 not pull a 300 MB wheel).
@@ -44,11 +51,44 @@ gunicorn and the Spark drivers do need a container restart to re-import.
 ## Rules that are easy to break
 
 **A Django `default=` is not a database default.** `batch_metric`,
-`classified_message`, `drift_event`, `training_job`, `model_version` and
-`stream_status` are all written by raw psycopg2 from the Spark services. Any
-field on those with a Python `default=` also needs `db_default=`, or an INSERT
-that omits the column hits a NOT NULL violation at runtime. This has bitten
-three times.
+`classified_message`, `drift_event`, `training_job`, `model_version`,
+`stream_status` and `experiment_run` are all written by raw psycopg2 — the
+first six from the Spark services, `experiment_run` by the matrix runner's
+`Repository.create_run`. Any field on those with a Python `default=` also needs
+`db_default=`, or an INSERT that omits the column hits a NOT NULL violation at
+runtime. This has bitten three times.
+
+**Every run has its own Kafka topic**, `posts.run-<id>`
+(`KafkaSettings.topic_for_run`). `KAFKA_TOPIC` is the prefix, not a topic. The
+producer creates it before `mark_run_started`, the runner before activating
+anything; the consumer never creates topics (its image has no kafka-python) and
+subscribes by run id. This is what makes `batch_id` start at 0 in every run —
+the scorer, the consumer's delay arithmetic and the dashboard all assume it.
+Checkpoints are per run too (`PathSettings.checkpoint_for_run`, on the host
+bind mount), so neither they nor topics die with the Postgres volume. The
+runner's `_claim_run_id` fails a cell whose new id already has either one.
+`HOST_ENV` sets `STREAMCLS_DATA_ROOT` so the host sees `./data`.
+
+**The consumer rebuilds its `DriftMonitor` at every query start**, not only on
+a model change: fresh detectors, a fresh grace window, `_pending_drift` cleared,
+then replay of *this* run's history. Without that, run N+1 on the same model
+inherits run N's ADWIN window. `stream_status.consumer_query_run_id` is the
+only reliable "the query has actually stopped" signal — it is set after
+`start()`, cleared after every stop and unconditionally at consumer startup.
+
+**During a matrix the runner owns `stream_status.is_active` and
+`producer_active`.** It reads a dropped consumer flag as the consumer's own
+surrender and fails the cell. The matrix ledger `results/<name>/runs.jsonl` is
+the resume state: a cell whose last line is `completed` is never redone, and
+`make report` takes the last line per cell. `--only` re-runs create a new
+`experiment_run` row with the same name. `MatrixRunner.run()` re-activates the
+base model in its `finally`, because `base_model = "active"` is resolved afresh
+per invocation, and it refuses to resume a ledger whose completed cells used a
+different base.
+
+**Retrains use the trainer's default seed and algorithm**
+(`services/trainer/worker.py`, `params.get("seed", 20260827)`), not the run's.
+Known limitation; document it, do not paper over it in results.
 
 **Table names are pinned** in `streamcls/db/tables.py` and set via
 `Meta.db_table`. Spark and psycopg2 address them by name.

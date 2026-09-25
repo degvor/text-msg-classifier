@@ -414,6 +414,8 @@ class FakeWorld:
         #: Ticks on which Ctrl-C is pressed, once each.
         self.interrupt_at_ticks: set[int] = set()
         self.topics: list[str] = []
+        #: Topics on the broker, including any left over from a previous database.
+        self.existing_topics: set[str] = set()
         self.scored: list[tuple[int, int]] = []
 
     # --- recording ---------------------------------------------------------
@@ -528,7 +530,9 @@ class FakeWorld:
     def ensure_topic(self, name: str) -> bool:
         self._record("ensure_topic", name)
         self.topics.append(name)
-        return True
+        created = name not in self.existing_topics
+        self.existing_topics.add(name)
+        return created
 
     def score(self, run_id: int, batch_size: int) -> FakeScore:
         self._record("score", (run_id, batch_size))
@@ -601,7 +605,12 @@ class FakeWorld:
             self._release_countdown = None
 
 
+#: A checkpoint root with nothing left over in it.
+NO_CHECKPOINTS = Path("/nonexistent/checkpoints")
+
+
 def runner(world: FakeWorld, **kwargs: Any) -> MatrixRunner:
+    kwargs.setdefault("checkpoint_for_run", lambda run_id: NO_CHECKPOINTS / f"run-{run_id}")
     return MatrixRunner(
         world,
         topic_for_run=world.topic_for_run,
@@ -824,6 +833,48 @@ def test_a_repository_error_mid_cell_becomes_an_error_row_not_a_crash(tmp_path):
     assert "kafka unreachable" in rows[0]["error"]
     assert world.runs[1].status == "aborted"
     assert code == 1
+
+
+# ---------------------------------------------------------------------------
+# Leftovers from a previous database: run ids restart at 1, host-side
+# checkpoints and Kafka topics do not
+# ---------------------------------------------------------------------------
+
+
+def test_a_leftover_checkpoint_for_a_new_run_id_fails_the_cell_before_the_producer(tmp_path):
+    """A query resuming a leftover checkpoint believes the stream is already
+    consumed, reads nothing and stalls, silently, until the cell times out."""
+    world = FakeWorld()
+    checkpoints = tmp_path / "checkpoints"
+    (checkpoints / "run-1" / "commits").mkdir(parents=True)
+    spec, cells = two_cells()
+    code = runner(world, checkpoint_for_run=lambda run_id: checkpoints / f"run-{run_id}").run(
+        spec, cells, ledger=tmp_path / "runs.jsonl"
+    )
+
+    assert code == 1
+    rows = read_ledger(tmp_path / "runs.jsonl")
+    assert [r["status"] for r in rows] == ["error", "completed"]
+    assert str(checkpoints / "run-1") in rows[0]["error"]
+    assert world.runs[1].status == "aborted"
+    assert [arg for _, arg, _ in world.calls_named("activate_run")] == [(2, True, False)]
+    assert world.topics == ["posts.run-2"], "no topic is created for the failed run"
+
+
+def test_a_topic_that_existed_before_its_run_fails_the_cell_before_the_producer(tmp_path):
+    """The Kafka side of the same collision: the producer would append a
+    second copy of the stream to the leftover one."""
+    world = FakeWorld()
+    world.existing_topics.add("posts.run-1")
+    spec, cells = two_cells()
+    code = runner(world).run(spec, cells, ledger=tmp_path / "runs.jsonl")
+
+    assert code == 1
+    rows = read_ledger(tmp_path / "runs.jsonl")
+    assert [r["status"] for r in rows] == ["error", "completed"]
+    assert "posts.run-1" in rows[0]["error"]
+    assert world.runs[1].status == "aborted"
+    assert [arg for _, arg, _ in world.calls_named("activate_run")] == [(2, True, False)]
 
 
 # ---------------------------------------------------------------------------
@@ -1058,6 +1109,31 @@ def test_cli_dry_run_prints_the_plan_and_opens_no_connection(tmp_path, monkeypat
     assert "2 cell(s), 2 pending" in out
     assert "concept_abrupt/adaptive/seed20260827" in out
     assert "estimated wall clock" in out
+
+
+def test_cli_refuses_to_run_when_the_data_root_is_not_on_this_host(
+    tmp_path, monkeypatch, capsys
+):
+    """The leftover-checkpoint check looks under the data root. Pointed at the
+    containers' ``/data`` on the host, it would never find anything."""
+    import types
+
+    import streamcls.__main__ as cli
+    from streamcls.config import PathSettings
+
+    def no_db(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("must refuse before connecting")
+
+    missing = tmp_path / "not-mounted"
+    monkeypatch.setattr(cli, "Repository", no_db)
+    monkeypatch.setattr(
+        cli, "get_settings", lambda: types.SimpleNamespace(paths=PathSettings(data_root=missing))
+    )
+    code = cli.main(["matrix", str(SPECS / "smoke.toml"), "--results", str(tmp_path)])
+
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "STREAMCLS_DATA_ROOT" in err and str(missing) in err
 
 
 def test_cli_dry_run_reports_completed_cells_from_the_ledger(tmp_path, capsys):

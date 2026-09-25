@@ -21,7 +21,8 @@ Why the lifecycle is ordered the way it is (each step closes a race):
    at query start;
 3. re-activate the base model (``force``: the retrained incumbent is usually
    better on recent data and the guard would rightly refuse);
-4. create the run row and its Kafka topic;
+4. create the run row and its Kafka topic, refusing a run id whose checkpoint
+   or topic survived from a previous database;
 5. start only the producer and wait for it to finish -- the consumer then
    starts against a complete backlog, so every batch is exactly
    ``max_offsets_per_trigger`` rows and batch composition is a pure function
@@ -551,7 +552,9 @@ class MatrixRunner:
     Every collaborator is injected so the whole thing runs against a fake:
     ``repo`` is a :class:`streamcls.db.repo.Repository` (or a stand-in with
     the same methods), ``topic_for_run`` names a run's topic,
-    ``ensure_topic`` creates it, ``score`` turns a finished run id into a
+    ``ensure_topic`` creates it and returns whether it was missing,
+    ``checkpoint_for_run`` is where the consumer will checkpoint a run, as
+    seen from this host, ``score`` turns a finished run id into a
     ``RunScore``. ``sleep`` and ``clock`` exist so tests do not wait.
     """
 
@@ -560,7 +563,8 @@ class MatrixRunner:
         repo: Any,
         *,
         topic_for_run: Callable[[int], str],
-        ensure_topic: Callable[[str], Any],
+        ensure_topic: Callable[[str], bool],
+        checkpoint_for_run: Callable[[int], Path],
         score: Callable[[int, int], Any],
         git_commit: str = "",
         git_dirty: bool = False,
@@ -572,6 +576,7 @@ class MatrixRunner:
         self._repo = repo
         self._topic_for_run = topic_for_run
         self._ensure_topic = ensure_topic
+        self._checkpoint_for_run = checkpoint_for_run
         self._score = score
         self._git_commit = git_commit
         self._git_dirty = git_dirty
@@ -726,7 +731,7 @@ class MatrixRunner:
                 topic_for_run=self._topic_for_run,
             )
             self._current = (cell, run_id, started)
-            self._ensure_topic(self._topic_for_run(run_id))
+            self._claim_run_id(run_id)
             # 5. Producer first, alone.
             self._repo.activate_run(run_id, producer=True, consumer=False)
             status = self._wait_for_status(run_id, ("completed", "aborted"), PRODUCER_TIMEOUT_S)
@@ -769,6 +774,28 @@ class MatrixRunner:
             )
 
     # --- steps ------------------------------------------------------------
+    def _claim_run_id(self, run_id: int) -> None:
+        """Create the run's topic, refusing an id something else already used.
+
+        Run ids restart at 1 when the Postgres volume is lost, but checkpoints
+        on the host and topics on the broker survive it. A leftover checkpoint
+        makes the query believe the stream is consumed, so it reads nothing
+        until the cell times out. A leftover topic gets a second copy of the
+        stream appended to the first.
+        """
+        checkpoint = self._checkpoint_for_run(run_id)
+        if checkpoint.exists():
+            raise RunnerError(
+                f"checkpoint {checkpoint} already exists for new run {run_id}; it is left over "
+                "from a previous database -- move the checkpoints directory aside"
+            )
+        topic = self._topic_for_run(run_id)
+        if not self._ensure_topic(topic):
+            raise RunnerError(
+                f"topic {topic} already existed before run {run_id}; it is left over from a "
+                "previous database -- delete it with kafka-topics.sh --delete"
+            )
+
     def _quiet(self) -> None:
         self._repo.set_stream_active(False)
         self._repo.set_producer_active(False)

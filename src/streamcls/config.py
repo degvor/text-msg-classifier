@@ -99,6 +99,11 @@ class PathSettings(BaseSettings):
     def checkpoint_root(self) -> Path:
         return self.data_root / "checkpoints"
 
+    def checkpoint_for_run(self, run_id: int) -> Path:
+        """Where the consumer checkpoints one run. The matrix runner checks it
+        from the host, so both must derive it here."""
+        return self.checkpoint_root / f"run-{int(run_id)}"
+
 
 class SparkSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SPARK_", env_file=_ENV_FILE, extra="ignore")

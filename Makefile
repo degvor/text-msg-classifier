@@ -16,9 +16,12 @@ SPARK_IMAGE := streamcls/spark:dev
 
 # Host-side commands reach the stack through the ports docker-compose.override.yml
 # publishes. Environment variables beat .env in pydantic-settings, so this
-# overrides POSTGRES_HOST=db without editing the file.
+# overrides POSTGRES_HOST=db without editing the file. The data root is the
+# directory the containers mount as /data; the matrix runner looks there for
+# leftover checkpoints.
 HOST_ENV := POSTGRES_HOST=localhost POSTGRES_PORT=$(or $(POSTGRES_HOST_PORT),55432) \
-            KAFKA_BOOTSTRAP_SERVERS=localhost:$(or $(KAFKA_HOST_PORT),9094)
+            KAFKA_BOOTSTRAP_SERVERS=localhost:$(or $(KAFKA_HOST_PORT),9094) \
+            STREAMCLS_DATA_ROOT=$(CURDIR)/data
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \

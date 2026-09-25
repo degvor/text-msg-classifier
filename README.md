@@ -164,6 +164,12 @@ Things to know while it runs:
   the consumer's own surrender looks like, so the cell is recorded as failed.
 - **Never `make down` mid-matrix** — it is `docker compose down -v` and drops
   Postgres. `docker compose stop` / `docker compose start` keeps everything.
+- **After Postgres is lost, run ids restart at 1, but `data/checkpoints/run-<id>`
+  on the host and `posts.run-<id>` on the broker do not.** A query resuming a
+  leftover checkpoint reads nothing, and a leftover topic gets a second copy of
+  the stream appended. The runner refuses such an id and fails that cell at
+  once, naming the leftover. Move `data/checkpoints` aside, and delete stale
+  topics with `kafka-topics.sh --delete`, before re-running.
 - `make matrix`, `make score` and `make compare` run on the host and reach the
   stack through the ports `docker-compose.override.yml` publishes
   (`HOST_ENV` in the Makefile); the services inside Docker keep using `db` and

@@ -148,6 +148,14 @@ def cmd_matrix(args) -> int:
     # creation per cell is nine lines of it.
     logging.getLogger("kafka").setLevel(logging.WARNING)
     settings = get_settings()
+    if not settings.paths.data_root.is_dir():
+        print(
+            f"cannot start: STREAMCLS_DATA_ROOT={settings.paths.data_root} is not a directory "
+            "on this host, so leftover checkpoints could not be seen; `make matrix` points it "
+            "at ./data",
+            file=sys.stderr,
+        )
+        return 2
     from streamcls.kafka_admin import ensure_topic
 
     commit, dirty = _git_state()
@@ -163,6 +171,7 @@ def cmd_matrix(args) -> int:
                 ensure_topic, settings.kafka.bootstrap_servers,
                 partitions=settings.kafka.num_partitions,
             ),
+            checkpoint_for_run=settings.paths.checkpoint_for_run,
             score=functools.partial(_score, repo),
             git_commit=commit,
             git_dirty=dirty,

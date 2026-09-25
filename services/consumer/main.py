@@ -44,7 +44,6 @@ import signal
 import sys
 import threading
 import time
-from pathlib import Path
 from types import FrameType
 
 from streamcls.config import Settings, get_settings
@@ -322,7 +321,7 @@ class Consumer:
     def _start_query(self, run_id: int, config: dict):
         from pyspark.sql import functions as F
 
-        checkpoint = Path(self.settings.paths.checkpoint_root) / f"run-{run_id}"
+        checkpoint = self.settings.paths.checkpoint_for_run(run_id)
         max_length = int(config["max_message_length"])
 
         raw = (
