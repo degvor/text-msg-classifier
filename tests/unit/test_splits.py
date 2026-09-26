@@ -9,7 +9,7 @@ import csv
 
 import pytest
 
-from streamcls.corpus.splits import build_splits, fingerprint
+from streamcls.corpus.splits import build_splits, fingerprint, split_retrain_window
 from streamcls.labels import N_CLASSES
 
 
@@ -110,3 +110,32 @@ def test_fingerprint_is_order_sensitive(corpus):
     splits = build_splits(corpus, sizes=SIZES)
     reversed_docs = list(reversed(splits.val))
     assert fingerprint(splits.val) != fingerprint(reversed_docs)
+
+
+# ---------------------------------------------------------------------------
+# The retrain window: what an adaptive retrain learns from and is judged on
+# ---------------------------------------------------------------------------
+
+
+def test_the_retrain_holdout_leaves_most_of_the_new_concept_to_train_on():
+    """thesis-v1 held out the newest block, which at retrain time *was* the
+    new concept: every retrain trained on 0 of its 2000 post-drift rows."""
+    # Newest first, as the stream window is read: 2000 new-concept rows, then 8000 old.
+    window = [("new", i) for i in range(2_000)] + [("old", i) for i in range(8_000)]
+    train, holdout = split_retrain_window(window, new_rows=2_000)
+
+    assert len(holdout) == 400
+    assert all(kind == "new" for kind, _ in holdout), "judged on the current concept only"
+    assert sum(kind == "new" for kind, _ in train) == 1_600
+    assert sorted(train + holdout) == sorted(window), "every row used exactly once"
+
+
+def test_without_a_new_row_count_the_holdout_is_spread_over_the_window():
+    train, holdout = split_retrain_window(list(range(10)), new_rows=0)
+    assert holdout == [0, 5]
+    assert train == [1, 2, 3, 4, 6, 7, 8, 9]
+
+
+def test_the_retrain_split_copes_with_a_short_window():
+    assert split_retrain_window([], new_rows=2_000) == ([], [])
+    assert split_retrain_window([1, 2, 3], new_rows=2_000) == ([2, 3], [1])

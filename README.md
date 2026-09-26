@@ -111,14 +111,15 @@ make compare BASELINE=1 ADAPTIVE=2 # the A/B figure
 ### The matrix
 
 The thesis numbers come from `experiments/matrix.toml`: 5 scenarios × 3 seeds
-× 2 arms, plus 4 ablations on two scenarios — 54 cells, about 6.5 hours. The
-runner performs every cell identically and unattended:
+× 2 arms, plus 5 ablations on two scenarios — 60 cells, about 5.5 hours (keep
+the machine on power with the lid open: `caffeinate` cannot stop lid-close
+sleep). The runner performs every cell identically and unattended:
 
 ```bash
 make matrix SPEC=experiments/smoke.toml ARGS=--dry-run   # the cell table and an estimate; touches nothing
 make matrix SPEC=experiments/smoke.toml                  # 2 cells, ~5 min: proves the lifecycle end to end
 make matrix                                              # the real one; leave it overnight
-make report                                              # results/thesis-v1/summary.md, summary.csv, pairs.csv, detectors.csv
+make report                                              # results/thesis-v2/summary.md, summary.csv, pairs.csv, detectors.csv
 ```
 
 Per cell the runner stops both services and waits for the consumer to release

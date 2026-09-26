@@ -28,7 +28,7 @@ from types import FrameType
 from services.trainer.train import register, train
 from streamcls.config import Settings, get_settings
 from streamcls.corpus.agnews import Document
-from streamcls.corpus.splits import build_splits
+from streamcls.corpus.splits import build_splits, split_retrain_window
 from streamcls.db.repo import Repository
 from streamcls.logging import configure, get_logger
 from streamcls.spark.session import build_session
@@ -145,11 +145,12 @@ class TrainerWorker:
         recent = self.repo.recent_labelled_messages(run_id, window_rows)
         window = [Document(text=text, label=label) for text, label in recent]
 
-        # The newest slice is held out, never trained on: it is the only data
-        # drawn from the *current* concept, so it is the only fair basis for
-        # deciding whether this model is an improvement.
-        holdout_size = max(1, len(window) // 5) if window else 0
-        holdout, window = window[:holdout_size], window[holdout_size:]
+        # The holdout is the only fair basis for deciding whether this model
+        # is an improvement, so it is drawn from the current concept -- but
+        # interleaved, so the rest of the new concept is trained on.
+        window, holdout = split_retrain_window(
+            window, new_rows=int(config.get("retrain_min_new_rows", 0))
+        )
 
         corpus_dir = Path(self.settings.paths.corpus_dir) / "agnews"
         base = build_splits(corpus_dir).train[:base_rows] if base_rows else []

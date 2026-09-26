@@ -54,8 +54,8 @@ compare: ## A/B two seed-matched runs: make compare BASELINE=1 ADAPTIVE=2
 matrix: ## Run an experiment matrix unattended (SPEC=experiments/matrix.toml, ARGS=--dry-run)
 	$(HOST_ENV) $(PY) -m streamcls matrix $(or $(SPEC),experiments/matrix.toml) $(ARGS)
 
-report: ## Aggregate results/<NAME>/runs.jsonl into summary tables (NAME=thesis-v1)
-	$(PY) -m streamcls report results/$(or $(NAME),thesis-v1)
+report: ## Aggregate results/<NAME>/runs.jsonl into summary tables (NAME=thesis-v2)
+	$(PY) -m streamcls report results/$(or $(NAME),thesis-v2)
 
 cluster: ## Start a real Spark standalone cluster (N=worker count)
 	$(COMPOSE) --profile cluster up -d --scale spark-worker=$(or $(N),2)

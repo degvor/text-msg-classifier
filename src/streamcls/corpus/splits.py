@@ -26,10 +26,21 @@ from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 from streamcls.corpus.agnews import Document, load_agnews
 
-__all__ = ["DEFAULT_SIZES", "Split", "SplitSet", "build_splits", "fingerprint"]
+__all__ = [
+    "DEFAULT_SIZES",
+    "RETRAIN_HOLDOUT_EVERY",
+    "Split",
+    "SplitSet",
+    "build_splits",
+    "fingerprint",
+    "split_retrain_window",
+]
+
+T = TypeVar("T")
 
 #: Rows drawn from the 120 000-row AG News train file. The remainder goes to
 #: ``train``.
@@ -158,3 +169,25 @@ def build_splits(
         stream_holdout=carved["stream_holdout"],
         test=test_docs,
     )
+
+
+#: One row in this many of the current concept is held out to judge a retrain.
+RETRAIN_HOLDOUT_EVERY = 5
+
+
+def split_retrain_window(window: Sequence[T], *, new_rows: int) -> tuple[list[T], list[T]]:
+    """Split a newest-first stream window into ``(train, holdout)`` for a retrain.
+
+    The holdout decides whether the retrained model is promoted, so it must
+    come from the current concept: the newest ``new_rows`` rows, which the
+    consumer waited for before queueing the retrain. It takes every
+    ``RETRAIN_HOLDOUT_EVERY``-th of them, not the newest block -- that block
+    *is* the new concept, and holding all of it out trained every thesis-v1
+    retrain on the old concept alone. ``new_rows = 0`` spreads the holdout over
+    the whole window.
+    """
+    current = min(new_rows, len(window)) if new_rows > 0 else len(window)
+    held = set(range(0, current, RETRAIN_HOLDOUT_EVERY))
+    train = [row for i, row in enumerate(window) if i not in held]
+    holdout = [row for i, row in enumerate(window) if i in held]
+    return train, holdout

@@ -17,7 +17,7 @@ make train PROMOTE=1   # train and activate a model
 make score             # results table
 make compare BASELINE=1 ADAPTIVE=2
 make matrix SPEC=experiments/smoke.toml ARGS=--dry-run   # cell table, no writes
-make matrix            # experiments/matrix.toml, resumable, ~6.5 h
+make matrix            # experiments/matrix.toml, resumable, ~5.5 h
 make report NAME=smoke # results/<NAME>/runs.jsonl -> summary.md + CSVs, no DB
 
 make test-unit         # no JVM, no DB, no Docker

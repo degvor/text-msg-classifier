@@ -1,17 +1,21 @@
-# The thesis results matrix: 5 scenarios x 3 seeds x 2 arms, plus 4 ablations
-# on the two scenarios where the retraining policy matters most (54 cells).
+# The thesis results matrix: 5 scenarios x 3 seeds x 2 arms, plus 5 ablations
+# on the two scenarios where the retraining policy matters most (60 cells).
 #
 #   make matrix ARGS=--dry-run     # the plan and a wall-clock estimate
 #   make matrix                    # runs it; resumable, one line per cell in
-#                                  # results/thesis-v1/runs.jsonl
+#                                  # results/thesis-v2/runs.jsonl
 #   make report                    # summary.md / summary.csv / pairs.csv
+#
+# thesis-v2 supersedes thesis-v1, whose retrains held out the newest block of
+# the window -- at retrain time, exactly the post-drift rows -- and so never
+# trained on the new concept. Its adaptive and ablation rows measure that bug.
 #
 # Every cell starts from the same base model with the same stream_config
 # (the [config] block is written before each cell), consumes its own Kafka
 # topic from offset 0, and is scored only once its retrains have finished.
 
 [matrix]
-name = "thesis-v1"
+name = "thesis-v2"
 seeds = [20260827, 20260828, 20260829]
 arms = ["baseline", "adaptive"]     # baseline never retrains; the A/B control
 
@@ -55,9 +59,12 @@ actionable_detectors = ["adwin_error"]
 [scenarios.recurring]
 
 # Ablations run the adaptive arm with one knob changed. retrain_base_rows is
-# the anti-forgetting sample mixed into every retrain (0 = retrain on the new
-# concept alone); retrain_min_new_rows is how much of the new concept must
-# have arrived before a detection is acted on.
+# the anti-forgetting sample mixed into every retrain (0 = no original
+# training data); retrain_min_new_rows is how much of the new concept must
+# have arrived before a detection is acted on. recent_only changes two knobs on
+# purpose: a window as long as retrain_min_new_rows and no base sample is a
+# retrain on the new concept alone. With the default 20000-row window, the
+# pre-drift rows in it out-vote a label swap even with no base sample.
 [[ablations]]
 name = "base_rows_0"
 scenarios = ["concept_abrupt", "covariate_gradual"]
@@ -77,3 +84,8 @@ config = { retrain_min_new_rows = 500 }
 name = "min_new_4000"
 scenarios = ["concept_abrupt", "covariate_gradual"]
 config = { retrain_min_new_rows = 4000 }
+
+[[ablations]]
+name = "recent_only"
+scenarios = ["concept_abrupt", "covariate_gradual"]
+config = { retrain_window_rows = 2000, retrain_base_rows = 0 }

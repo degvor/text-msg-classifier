@@ -1085,12 +1085,20 @@ def test_preflight_writes_nothing(tmp_path):
 SPECS = Path(__file__).resolve().parents[2] / "experiments"
 
 
-def test_the_shipped_thesis_spec_is_the_54_cell_matrix():
+def test_the_shipped_thesis_spec_is_the_60_cell_matrix():
     from streamcls.matrix import load_spec
 
     spec = load_spec(SPECS / "matrix.toml")
     cells = expand(spec)
-    assert spec.name == "thesis-v1" and len(cells) == 54
+    assert spec.name == "thesis-v2" and len(cells) == 60
+    # The lever thesis-v1 never varied: a retrain on the new concept alone.
+    recent_only = [c for c in cells if c.ablation == "recent_only"]
+    assert len(recent_only) == 6
+    assert all(
+        c.config["retrain_window_rows"] == c.config["retrain_min_new_rows"]
+        and c.config["retrain_base_rows"] == 0
+        for c in recent_only
+    )
     assert spec.config["adaptation_enabled"] is True, "the arm decides; config must not veto"
     assert spec.config["label_delay_batches"] == 0
 
