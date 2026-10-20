@@ -49,7 +49,13 @@ from types import FrameType
 from streamcls.config import Settings, get_settings
 from streamcls.corpus.schedule import DriftSchedule
 from streamcls.db.repo import ControlState, ModelRecord, Repository
-from streamcls.drift.monitor import DEFAULT_ACTIONABLE, DriftMonitor, DriftSignal, MonitorConfig
+from streamcls.drift.monitor import (
+    DEFAULT_ACTIONABLE,
+    DriftMonitor,
+    MonitorConfig,
+    MonitorResult,
+)
+from streamcls.drift.policy import PERIODIC, RetrainTrigger, TriggerConfig
 from streamcls.logging import configure, get_logger
 from streamcls.schemas import spark_schema
 from streamcls.spark.batch import aggregate_batch, pack_correct_bits, score
@@ -70,11 +76,10 @@ class Consumer:
         self._model = None
         self._model_record: ModelRecord | None = None
         self._monitor: DriftMonitor | None = None
-        #: A detection that fired before enough of the new concept had arrived.
-        #: Held because ADWIN detects *changes*: once the stream settles at the
-        #: new error rate it is stationary again and will never fire a second
-        #: time, so a deferred drift that is not remembered is lost forever.
-        self._pending_drift: DriftSignal | None = None
+        #: The retrain rule, including a detection held until enough of the
+        #: new concept has arrived (see streamcls.drift.policy). Rebuilt with
+        #: the monitor at every query start.
+        self._trigger: RetrainTrigger | None = None
         self._failures = 0
 
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -126,7 +131,7 @@ class Consumer:
             confidence_reference=list(record.confidence_reference or []),
             top_term_indices=list(record.top_term_indices or []),
         )
-        self._pending_drift = None
+        self._trigger = RetrainTrigger(TriggerConfig.from_stream_config(config))
         return monitor
 
     # --- per-batch -----------------------------------------------------------
@@ -144,6 +149,9 @@ class Consumer:
         schedule = DriftSchedule(events=list(run.drift_schedule))
         adaptation_on = bool(run.adaptation_enabled) and bool(config.get("adaptation_enabled", True))
         config = dict(config) | {"_adaptation_on": adaptation_on}
+        # Off only to measure what monitoring costs: classify and store, no
+        # feature histogram, no detectors, no drift statistics.
+        monitoring_on = bool(config.get("monitoring_enabled", True))
 
         def process(batch_df, batch_id: int) -> None:
             started = time.monotonic()
@@ -157,7 +165,7 @@ class Consumer:
                 if replay:
                     log.warning("replaying batch after restart", extra={"batch_id": batch_id})
 
-                aggregate = aggregate_batch(scored)
+                aggregate = aggregate_batch(scored, features=monitoring_on)
                 if aggregate.is_empty:
                     return
 
@@ -167,7 +175,12 @@ class Consumer:
 
                 monitor = self._monitor
                 assert monitor is not None
-                result = monitor.observe(aggregate, apply=not replay)
+                if monitoring_on:
+                    result = monitor.observe(aggregate, apply=not replay)
+                else:
+                    result = MonitorResult(signals=(), stats=dict.fromkeys(
+                        ("psi_confidence", "psi_predicted", "psi_vocabulary", "js_vocabulary")
+                    ))
                 stats = result.stats
                 self.repo.write_batch_metric(
                     experiment_run_id=run_id,
@@ -186,12 +199,16 @@ class Consumer:
                     true_hist=_json(aggregate.true_hist),
                     correct_bits=_binary(pack_correct_bits(aggregate.correct_sequence)),
                     throughput_msgs_s=_throughput(aggregate.n_classified, started),
-                    adwin_estimate=monitor._adwin.estimation,
-                    adwin_width=monitor._adwin.width,
-                    ddm_warning=monitor._ddm.warning_detected,
+                    adwin_estimate=monitor._adwin.estimation if monitoring_on else None,
+                    adwin_width=monitor._adwin.width if monitoring_on else None,
+                    ddm_warning=monitor._ddm.warning_detected if monitoring_on else False,
                     **stats,
                 )
-                if result.signals or self._pending_drift is not None:
+                trigger = self._trigger
+                assert trigger is not None
+                # Never on a replayed batch: its job, if it had one, was queued
+                # the first time, and a schedule would queue it again.
+                if not replay and (result.signals or trigger.wants_every_batch):
                     self._handle_drift(run_id, batch_id, aggregate, result, schedule, config)
                 self.repo.consumer_heartbeat(last_batch_id=batch_id)
                 log.info(
@@ -211,47 +228,52 @@ class Consumer:
         return process
 
     def _handle_drift(self, run_id, batch_id, aggregate, result, schedule, config) -> None:
-        """Record what fired and, if permitted, queue exactly one retrain."""
+        """Record what fired and, if the rule and the guards permit, queue one retrain.
+
+        The rule -- wait for enough of the new concept, hold an early
+        detection, or follow a schedule -- is ``streamcls.drift.policy``.
+        """
         change_point = schedule.preceding_change_point(
             batch_id * int(config["max_offsets_per_trigger"])
         )
-        # A drift held over from an earlier batch counts as actionable now.
-        first_actionable = result.actionable[0] if result.actionable else self._pending_drift
         adaptation_on = config.get("_adaptation_on", False)
-        job_id = None
+        trigger = self._trigger
+        assert trigger is not None
+        held_before = trigger.pending is not None
+        decision = trigger.decide(
+            batch_id=batch_id,
+            actionable=result.actionable,
+            change_point=change_point,
+            messages_since=lambda origin: self.repo.messages_since(run_id, origin),
+        )
 
-        # Retraining on the first few hundred rows of a new concept produces a
-        # worse model and spends one of the run's retrain budget, so wait until
-        # enough of the new concept exists to learn from.
-        enough_new_data = True
-        if first_actionable is not None and change_point is not None:
-            required = int(config.get("retrain_min_new_rows", 0))
-            if required:
-                seen = self.repo.messages_since(run_id, change_point)
-                enough_new_data = seen >= required
-
-        if first_actionable is not None and not enough_new_data:
-            if self._pending_drift is None:
+        if decision.action in ("defer", "drop"):
+            # Retraining on the first few hundred rows of a new concept produces
+            # a worse model and spends one of the run's retrain budget.
+            if decision.action == "drop" or not held_before:
                 log.info(
-                    "drift detected; deferring retrain until enough new data",
-                    extra={"batch_id": batch_id, "required": required},
+                    "drift detected before enough new data; "
+                    + ("holding it" if decision.action == "defer" else "dropping it"),
+                    extra={"batch_id": batch_id, "new_rows": decision.new_rows,
+                           "origin": decision.origin},
                 )
-            # Held, not dropped. ADWIN detects *changes*: once the stream
-            # settles at the new error rate it is stationary again and will
-            # never fire a second time, so a deferred drift that is forgotten
-            # is lost for the rest of the run.
-            self._pending_drift = first_actionable
             self._record_events(run_id, batch_id, aggregate, result, change_point, config, None)
             return
 
-        if first_actionable is not None and adaptation_on:
+        job_id = None
+        if decision.action == "queue" and adaptation_on:
             # Guarded inside one transaction: cooldown, no concurrent job, and a
             # per-run cap. Drift fires on several consecutive batches, so without
             # these a single change point would queue a dozen training runs.
             job_id = self.repo.enqueue_training_job(
                 run_id=run_id,
                 drift_event_id=None,
-                params={"trigger": first_actionable.detector, "batch_id": batch_id},
+                params={
+                    "trigger": decision.trigger,
+                    "batch_id": batch_id,
+                    "new_data_origin": decision.origin,
+                    "new_rows": decision.new_rows,
+                },
                 min_batches_between=int(config["min_batches_between_retrains"]),
                 current_batch=batch_id,
                 max_per_run=int(config["max_retrains_per_run"]),
@@ -259,24 +281,28 @@ class Consumer:
 
         self._record_events(
             run_id, batch_id, aggregate, result, change_point, config, job_id,
-            trigger=first_actionable if job_id else None,
+            trigger=decision.signal if job_id else None,
         )
 
         if job_id:
-            self._pending_drift = None
+            trigger.queued()
             log.warning(
-                "drift detected; retrain queued",
+                "retrain queued",
                 extra={
                     "batch_id": batch_id,
-                    "detector": first_actionable.detector,
+                    "trigger": decision.trigger,
                     "accuracy": round(aggregate.accuracy or 0.0, 4),
                     "job_id": job_id,
                 },
             )
-            # Reset, or this same drift fires on every later batch and the
-            # cooldown becomes the only thing preventing a retrain storm.
-            assert self._monitor is not None
-            self._monitor.reset()
+            if decision.trigger != PERIODIC:
+                # Reset, or this same drift fires on every later batch and the
+                # cooldown becomes the only thing preventing a retrain storm. A
+                # scheduled retrain leaves the detectors alone: they decide
+                # nothing under that policy, and their record stays comparable
+                # with the static arm's.
+                assert self._monitor is not None
+                self._monitor.reset()
 
     def _record_events(
         self, run_id, batch_id, aggregate, result, change_point, config, job_id, *, trigger=None

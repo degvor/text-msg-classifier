@@ -273,6 +273,67 @@ class StreamConfig(SingletonModel):
         help_text="Detectors whose signals trigger a retrain; the rest are recorded only.",
     )
 
+    # --- adaptation policy variants (controlled experiments) ------------------
+    # Every default below reproduces the guarded policy the thesis matrices
+    # ran; each knob switches off or replaces exactly one of its parts, so a
+    # comparison changes one thing at a time. All are written by the matrix
+    # runner through raw SQL, hence db_default on every one.
+    retrain_trigger = models.CharField(
+        max_length=16,
+        choices=[("drift", "drift signal"), ("periodic", "fixed schedule")],
+        default="drift",
+        db_default="drift",
+        help_text="What queues a retrain: an actionable drift signal, or a fixed schedule.",
+    )
+    periodic_retrain_batches = models.IntegerField(
+        default=0,
+        db_default=0,
+        validators=[MinValueValidator(0)],
+        help_text="With the periodic trigger: queue a retrain every this many batches.",
+    )
+    retain_pending_drift = models.BooleanField(
+        default=True,
+        db_default=True,
+        help_text=(
+            "Hold a drift detected before enough new data exists until it does. Off, such "
+            "a detection is dropped and only a later signal can trigger a retrain."
+        ),
+    )
+    new_data_origin = models.CharField(
+        max_length=16,
+        choices=[("change_point", "known change point"), ("detection", "detection batch")],
+        default="change_point",
+        db_default="change_point",
+        help_text=(
+            "Where the count of new-concept messages starts: the change point the "
+            "generator injected, or the first message of the batch the drift was detected in."
+        ),
+    )
+    retrain_holdout_rows = models.IntegerField(
+        default=0,
+        db_default=0,
+        validators=[MinValueValidator(0)],
+        help_text=(
+            "Newest rows the promotion holdout is drawn from (every fifth). 0 means "
+            "retrain_min_new_rows."
+        ),
+    )
+    promotion_comparison = models.CharField(
+        max_length=16,
+        choices=[("live", "live accuracy"), ("matched_holdout", "same holdout")],
+        default="live",
+        db_default="live",
+        help_text=(
+            "What the candidate's holdout accuracy is compared with: the incumbent's "
+            "live accuracy, or the incumbent scored on the same holdout."
+        ),
+    )
+    monitoring_enabled = models.BooleanField(
+        default=True,
+        db_default=True,
+        help_text="Off: classify and store only, no detectors or drift statistics (cost baseline).",
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

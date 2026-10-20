@@ -233,3 +233,72 @@ def test_live_accuracy_can_be_scoped_to_the_current_concept(repo):
         )
     assert repo.live_accuracy(run_id=run.pk) == pytest.approx((450 * 3 + 250 * 2) / 2500)
     assert repo.live_accuracy(run_id=run.pk, since_batch=3) == pytest.approx(0.5)
+
+
+def test_every_guarded_decision_is_recorded_on_the_candidate(repo):
+    """Accepted or rejected, the scores and the rule survive for the analysis."""
+    good = _register(repo, "v1", 0.90)
+    repo.promote_model(good)
+    bad = _register(repo, "v2", 0.70)
+    assert repo.promote_model(bad, min_delta=0.01) is False
+
+    record = ModelVersion.objects.get(pk=bad).metrics["promotion"]
+    assert record["promoted"] is False
+    assert record["rule"] == "test"
+    assert record["candidate_score"] == pytest.approx(0.70)
+    assert record["incumbent_score"] == pytest.approx(0.90)
+    assert record["incumbent_id"] == good
+    assert record["margin"] == pytest.approx(0.70 - 0.89)
+    # the existing metrics are kept, the decision is merged in
+    assert ModelVersion.objects.get(pk=bad).metrics["test"]["accuracy"] == pytest.approx(0.70)
+
+
+def test_a_forced_reset_records_no_decision(repo):
+    first = _register(repo, "v1", 0.90)
+    repo.promote_model(first)
+    second = _register(repo, "v2", 0.50)
+    assert repo.promote_model(second, force=True) is True
+    assert "promotion" not in ModelVersion.objects.get(pk=second).metrics
+
+
+def test_the_matched_holdout_rule_compares_on_the_same_messages(repo):
+    """The incumbent's live accuracy would let this candidate through; on the
+    candidate's own holdout the incumbent is better, so the matched rule refuses."""
+    incumbent = _register(repo, "v1", 0.90)
+    repo.promote_model(incumbent)
+    candidate = _register(repo, "v2", 0.80, recent=0.62)
+
+    assert repo.promote_model(candidate, min_delta=0.01, incumbent_score=0.70) is False
+    record = ModelVersion.objects.get(pk=candidate).metrics["promotion"]
+    assert record["rule"] == "matched_holdout"
+    assert record["incumbent_score"] == pytest.approx(0.70)
+    assert record["candidate_score"] == pytest.approx(0.62)
+
+    assert repo.promote_model(candidate, min_delta=0.01, incumbent_score=0.625) is True
+    assert ModelVersion.objects.get(pk=candidate).status == ModelStatus.ACTIVE
+
+
+def test_annotate_merges_top_level_keys(repo):
+    model_id = _register(repo, "v1", 0.90)
+    repo.annotate_model(model_id, timings={"corpus_s": 1.5}, incumbent_holdout_accuracy=0.5)
+    metrics = ModelVersion.objects.get(pk=model_id).metrics
+    assert metrics["timings"] == {"corpus_s": 1.5}
+    assert metrics["incumbent_holdout_accuracy"] == pytest.approx(0.5)
+    assert metrics["test"]["accuracy"] == pytest.approx(0.90)
+
+
+def test_an_orphaned_running_job_is_requeued_after_its_lease(repo):
+    """A trainer killed mid-job must not block the run forever."""
+    from dashboard.models import ExperimentRun, TrainingJob
+
+    run = ExperimentRun.objects.create(name="r", seed=1, total_messages=10)
+    job = TrainingJob.objects.create(experiment_run=run, status="running")
+    TrainingJob.objects.filter(pk=job.pk).update(started_at="2020-01-01T00:00:00Z")
+    fresh = TrainingJob.objects.create(experiment_run=run, status="running")
+    TrainingJob.objects.filter(pk=fresh.pk).update(started_at="2999-01-01T00:00:00Z")
+
+    assert repo.requeue_stale_jobs(lease_s=120) == [job.pk]
+    job.refresh_from_db()
+    assert job.status == "queued"
+    assert job.started_at is None
+    assert TrainingJob.objects.get(pk=fresh.pk).status == "running"

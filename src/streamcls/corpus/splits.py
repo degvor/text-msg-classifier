@@ -175,7 +175,9 @@ def build_splits(
 RETRAIN_HOLDOUT_EVERY = 5
 
 
-def split_retrain_window(window: Sequence[T], *, new_rows: int) -> tuple[list[T], list[T]]:
+def split_retrain_window(
+    window: Sequence[T], *, new_rows: int, train_rows: int | None = None
+) -> tuple[list[T], list[T]]:
     """Split a newest-first stream window into ``(train, holdout)`` for a retrain.
 
     The holdout decides whether the retrained model is promoted, so it must
@@ -185,9 +187,16 @@ def split_retrain_window(window: Sequence[T], *, new_rows: int) -> tuple[list[T]
     *is* the new concept, and holding all of it out trained every thesis-v1
     retrain on the old concept alone. ``new_rows = 0`` spreads the holdout over
     the whole window.
+
+    ``train_rows`` caps the training part at the newest ``train_rows`` rows
+    while the holdout still spans the newest ``new_rows``: a retrain on fewer
+    new rows than the holdout covers is judged on the same holdout as every
+    other, which a comparison of training-set compositions needs. ``None``
+    trains on the whole window.
     """
     current = min(new_rows, len(window)) if new_rows > 0 else len(window)
     held = set(range(0, current, RETRAIN_HOLDOUT_EVERY))
-    train = [row for i, row in enumerate(window) if i not in held]
+    limit = len(window) if train_rows is None else min(train_rows, len(window))
+    train = [row for i, row in enumerate(window) if i < limit and i not in held]
     holdout = [row for i, row in enumerate(window) if i in held]
     return train, holdout

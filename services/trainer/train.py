@@ -135,6 +135,7 @@ def train(
     documents: list | None = None,
     holdout: list | None = None,
     spark: object | None = None,
+    from_artifact: Path | None = None,
     **params,
 ) -> TrainResult:
     """Fit, evaluate, save and verify a model.
@@ -153,6 +154,11 @@ def train(
     ``spark`` lets a caller supply a session to reuse. The trainer worker does,
     because paying session startup on every retrain would inflate the
     adaptation-latency measurement.
+
+    ``from_artifact`` evaluates and references an already-saved model instead
+    of fitting one, and registers it where it lies. It restores a base model
+    after the database was lost: the artefact survives on the host, but the
+    drift references and metrics live in the registry.
     """
     started = time.monotonic()
     corpus_dir = Path(settings.paths.corpus_dir) / "agnews"
@@ -204,8 +210,13 @@ def train(
             extra={"algorithm": algorithm, "train_rows": train_rows, "params": params},
         )
 
-        pipeline = build_pipeline(algorithm, seed=seed, **params)
-        model = pipeline.fit(train_df)
+        if from_artifact is not None:
+            from pyspark.ml import PipelineModel
+
+            model = PipelineModel.load(str(from_artifact))
+        else:
+            pipeline = build_pipeline(algorithm, seed=seed, **params)
+            model = pipeline.fit(train_df)
 
         # Tuned on val, scored once on test. Reporting the tuning set as the
         # headline number is the most common way to overstate a result.
@@ -231,12 +242,16 @@ def train(
                 extra={"rows": len(holdout), "accuracy": recent_eval.accuracy},
             )
 
-        version = version or f"{algorithm}-{time.strftime('%Y%m%d-%H%M%S')}"
-        artifact_path = Path(settings.paths.model_root) / version
-        if artifact_path.exists():
-            shutil.rmtree(artifact_path)
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        model.write().overwrite().save(str(artifact_path))
+        if from_artifact is not None:
+            artifact_path = Path(from_artifact)
+            version = version or artifact_path.name
+        else:
+            version = version or f"{algorithm}-{time.strftime('%Y%m%d-%H%M%S')}"
+            artifact_path = Path(settings.paths.model_root) / version
+            if artifact_path.exists():
+                shutil.rmtree(artifact_path)
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            model.write().overwrite().save(str(artifact_path))
 
         _verify_reloadable(spark, artifact_path, test_df)
 
@@ -244,7 +259,8 @@ def train(
             version=version,
             artifact_path=artifact_path,
             algorithm=algorithm,
-            hyperparams=dict(params) | {"seed": seed},
+            hyperparams=dict(params) | {"seed": seed}
+            | ({"from_artifact": True} if from_artifact is not None else {}),
             val=val_eval,
             test=test_eval,
             recent=recent_eval,
@@ -286,6 +302,7 @@ def register(
     min_delta: float,
     run_id: int | None = None,
     since_batch: int | None = None,
+    incumbent_score: float | None = None,
 ) -> int:
     with Repository(settings.postgres) as repo:
         model_id = repo.register_model(
@@ -314,7 +331,8 @@ def register(
 
         if promote:
             if repo.promote_model(
-                model_id, min_delta=min_delta, run_id=run_id, since_batch=since_batch
+                model_id, min_delta=min_delta, run_id=run_id, since_batch=since_batch,
+                incumbent_score=incumbent_score,
             ):
                 log.info("promoted to active", extra={"model_id": model_id})
             else:
@@ -338,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-register", action="store_true", help="train and report only")
     parser.add_argument("--promote", action="store_true", help="activate if the guard passes")
     parser.add_argument("--min-delta", type=float, default=0.01)
+    parser.add_argument(
+        "--from-artifact", type=Path, default=None,
+        help="register an already-saved model directory instead of fitting one",
+    )
     args = parser.parse_args(argv)
 
     configure("trainer")
@@ -353,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
         min_df=args.min_df,
         reg_param=args.reg_param,
         max_iter=args.max_iter,
+        from_artifact=args.from_artifact,
     )
 
     print(f"\n=== {result.version} ({result.algorithm}) in {result.seconds:.1f}s ===")  # noqa: T201

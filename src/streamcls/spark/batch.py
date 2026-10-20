@@ -86,8 +86,13 @@ def score(predictions: DataFrame) -> DataFrame:
     )
 
 
-def aggregate_batch(scored_df: DataFrame) -> BatchAggregate:
-    """Reduce a scored batch to driver-side scalars with one Spark job."""
+def aggregate_batch(scored_df: DataFrame, *, features: bool = True) -> BatchAggregate:
+    """Reduce a scored batch to driver-side scalars with one Spark job.
+
+    ``features=False`` leaves out the vocabulary histogram -- the costliest
+    term, a sum over 20 000-dimensional vectors -- for the run that measures
+    classification without drift monitoring.
+    """
     from pyspark.ml.stat import Summarizer
     from pyspark.sql import functions as F
 
@@ -101,8 +106,9 @@ def aggregate_batch(scored_df: DataFrame) -> BatchAggregate:
         F.array_sort(
             F.collect_list(F.struct(F.col("_offset"), F.col(CORRECT_COLUMN)))
         ).alias("correct_pairs"),
-        Summarizer.sum(F.col(RAW_FEATURE_COLUMN)).alias("feature_sums"),
     ]
+    if features:
+        aggregations.append(Summarizer.sum(F.col(RAW_FEATURE_COLUMN)).alias("feature_sums"))
     for index in range(CONFIDENCE_BINS):
         low = index / CONFIDENCE_BINS
         high = (index + 1) / CONFIDENCE_BINS
@@ -134,7 +140,11 @@ def aggregate_batch(scored_df: DataFrame) -> BatchAggregate:
 
     n_correct = int(row["n_correct"] or 0)
     correct_sequence = [int(pair[CORRECT_COLUMN]) for pair in (row["correct_pairs"] or [])]
-    feature_sums = list(row["feature_sums"].toArray()) if row["feature_sums"] is not None else []
+    feature_sums = (
+        list(row["feature_sums"].toArray())
+        if features and row["feature_sums"] is not None
+        else []
+    )
 
     return BatchAggregate(
         n_classified=n,

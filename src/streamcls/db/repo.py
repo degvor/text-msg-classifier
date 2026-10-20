@@ -25,6 +25,7 @@ from psycopg2.extras import Json
 
 from streamcls.config import PostgresSettings
 from streamcls.db.tables import Table
+from streamcls.promotion import decide
 
 __all__ = ["ControlState", "ModelRecord", "Repository", "RunProgress", "RunSpec"]
 
@@ -395,6 +396,7 @@ class Repository:
         run_id: int | None = None,
         since_batch: int | None = None,
         force: bool = False,
+        incumbent_score: float | None = None,
     ) -> bool:
         """Make ``model_id`` the active version, if it is not clearly worse.
 
@@ -414,6 +416,12 @@ class Repository:
         resetting to the base model between experiment cells: that is not a
         promotion, and the guard would rightly refuse it -- the retrained
         incumbent usually *is* better on recent data.
+
+        ``incumbent_score`` is the incumbent's accuracy on the candidate's own
+        holdout, scored by the trainer: given, the two are compared on the same
+        messages (the ``matched_holdout`` rule) instead of the default above.
+        Every guarded decision, accepted or not, is recorded on the candidate
+        as ``metrics.promotion`` (see ``streamcls.promotion``).
 
         Retire-then-activate happens in one transaction because
         ``only_one_active_model_version`` is a real constraint.
@@ -442,10 +450,25 @@ class Repository:
 
             if incumbent is not None and incumbent["id"] != model_id:
                 if not force:
-                    new_score, old_score = self._comparable_scores(
-                        candidate, incumbent, run_id=run_id, since_batch=since_batch
+                    if incumbent_score is not None and candidate["recent_accuracy"] is not None:
+                        new_score, old_score, rule = (
+                            candidate["recent_accuracy"], incumbent_score, "matched_holdout"
+                        )
+                    else:
+                        new_score, old_score, rule = self._comparable_scores(
+                            candidate, incumbent, run_id=run_id, since_batch=since_batch
+                        )
+                    decision = decide(new_score, old_score, min_delta=min_delta, rule=rule)
+                    cur.execute(
+                        f"""
+                        UPDATE {Table.MODEL_VERSION}
+                        SET metrics = metrics || jsonb_build_object('promotion', %s::jsonb)
+                        WHERE id = %s
+                        """,
+                        (json.dumps(decision.as_dict() | {"incumbent_id": incumbent["id"]}),
+                         model_id),
                     )
-                    if new_score < old_score - min_delta:
+                    if not decision.promoted:
                         return False
                 cur.execute(
                     f"UPDATE {Table.MODEL_VERSION} SET status = 'retired' WHERE id = %s",
@@ -471,6 +494,18 @@ class Repository:
                     f"{Table.STREAM_STATUS} has no row with id=1; cannot signal the consumer"
                 )
         return True
+
+    def annotate_model(self, model_id: int, **entries: Any) -> None:
+        """Merge ``entries`` into the model's ``metrics`` as top-level keys.
+
+        For what is known only after registration: the job's stage timings and
+        the incumbent's score on the candidate's holdout.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"UPDATE {Table.MODEL_VERSION} SET metrics = metrics || %s::jsonb WHERE id = %s",
+                (json.dumps(entries), model_id),
+            )
 
     # --- stream output ------------------------------------------------------
     def write_batch_metric(self, **fields: Any) -> None:
@@ -613,6 +648,28 @@ class Repository:
             )
             return int(cur.fetchone()["id"])
 
+    def requeue_stale_jobs(self, *, lease_s: float) -> list[int]:
+        """Put back in the queue any job ``running`` for longer than ``lease_s``.
+
+        A trainer killed mid-job leaves its job ``running`` forever, and an
+        active job blocks every later retrain of that run (one job at a time)
+        and keeps the run from ever finishing. A retrain takes seconds, so a
+        lease of minutes only ever catches an orphan -- and it stays safe with
+        several workers, which a requeue-everything-at-startup rule would not.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.TRAINING_JOB}
+                SET status = 'queued', started_at = NULL,
+                    error = 'requeued: running longer than the lease'
+                WHERE status = 'running' AND started_at < now() - make_interval(secs => %s)
+                RETURNING id
+                """,
+                (lease_s,),
+            )
+            return [row["id"] for row in cur.fetchall()]
+
     def claim_training_job(self) -> dict[str, Any] | None:
         """Atomically take the oldest queued job.
 
@@ -705,8 +762,8 @@ class Repository:
         *,
         run_id: int | None = None,
         since_batch: int | None = None,
-    ) -> tuple[float, float]:
-        """Score both models on the same kind of data.
+    ) -> tuple[float, float, str]:
+        """Score both models on the same kind of data; also say which data.
 
         Order of preference:
 
@@ -722,16 +779,16 @@ class Repository:
         concept drift the fixed set still encodes the old labelling.
         """
         if candidate["recent_accuracy"] is None:
-            return (candidate["test_accuracy"] or 0.0, incumbent["test_accuracy"] or 0.0)
+            return (candidate["test_accuracy"] or 0.0, incumbent["test_accuracy"] or 0.0, "test")
 
         new_score = candidate["recent_accuracy"]
         if incumbent["recent_accuracy"] is not None:
-            return (new_score, incumbent["recent_accuracy"])
+            return (new_score, incumbent["recent_accuracy"], "recent")
 
         measured = self.live_accuracy(run_id=run_id, since_batch=since_batch)
         if measured is not None:
-            return (new_score, measured)
-        return (new_score, incumbent["test_accuracy"] or 0.0)
+            return (new_score, measured, "live")
+        return (new_score, incumbent["test_accuracy"] or 0.0, "test")
 
     def set_producer_active(self, active: bool) -> None:
         with self.cursor() as cur:

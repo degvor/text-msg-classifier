@@ -139,3 +139,24 @@ def test_without_a_new_row_count_the_holdout_is_spread_over_the_window():
 def test_the_retrain_split_copes_with_a_short_window():
     assert split_retrain_window([], new_rows=2_000) == ([], [])
     assert split_retrain_window([1, 2, 3], new_rows=2_000) == ([2, 3], [1])
+
+
+def test_a_short_training_part_is_judged_on_the_same_holdout():
+    """Composition control: 500 newest rows trained on, holdout over the newest 2000."""
+    window = [("new", i) for i in range(2_000)] + [("old", i) for i in range(18_000)]
+    train, holdout = split_retrain_window(window, new_rows=2_000, train_rows=500)
+    _, full_holdout = split_retrain_window(window, new_rows=2_000)
+
+    assert holdout == full_holdout, "same holdout whatever the training part"
+    assert len(holdout) == 400
+    assert len(train) == 400, "the newest 500 minus the 100 of them held out"
+    assert all(kind == "new" for kind, _ in train)
+    assert not set(train) & set(holdout)
+
+
+def test_train_rows_beyond_the_window_change_nothing():
+    window = list(range(10))
+    assert split_retrain_window(window, new_rows=0, train_rows=50) == split_retrain_window(
+        window, new_rows=0
+    )
+

@@ -23,6 +23,7 @@ from __future__ import annotations
 import signal
 import sys
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 from types import FrameType
 
@@ -142,12 +143,18 @@ class Producer:
     def _emit_run(self, run: RunSpec) -> None:
         pool = self._stream_pool(run.dataset_split)
         schedule = DriftSchedule(events=list(run.drift_schedule))
+        # Live mode stamps each message with the moment it is due
+        # (start + index / rate) and sends it then, so produced_at is the send
+        # time and classified_at - produced_at the end-to-end latency. Replay
+        # mode keeps the stream's nominal stamps and does not wait.
+        live = run.mode == "live" and run.rate_msgs_per_sec > 0
         stream = SeededStream(
             documents=pool,
             schedule=schedule,
             seed=run.seed,
             run_id=run.id,
             total_messages=run.total_messages,
+            **({"interval_seconds": 1.0 / run.rate_msgs_per_sec} if live else {}),
         )
 
         # One topic per run, so Spark's batch ids start at 0 for this run.
@@ -174,10 +181,8 @@ class Producer:
         # maxOffsetsPerTrigger messages in offset order. That is what makes
         # batch composition -- and therefore every per-batch chart -- identical
         # between two runs with the same seed.
-        delay = 0.0
-        if run.mode == "live" and run.rate_msgs_per_sec > 0:
-            delay = 1.0 / run.rate_msgs_per_sec
-
+        if live:
+            stream.start_time = datetime.now(UTC)  # the schedule starts with the first send
         sent = 0
         try:
             for message in stream:
@@ -186,6 +191,12 @@ class Producer:
                     self.repo.mark_run_finished(run.id, status="aborted")
                     return
 
+                if live:
+                    # Pace by the absolute schedule, so a slow send does not
+                    # accumulate into drift between stamps and real time.
+                    due = (message.produced_at - datetime.now(UTC)).total_seconds()
+                    if due > 0:
+                        self.stop_event.wait(due)
                 self.producer.send(
                     topic, key=message.kafka_key(), value=message.model_dump_json()
                 )
@@ -198,8 +209,6 @@ class Producer:
                         "progress",
                         extra={"run_id": run.id, "sent": sent, "total": run.total_messages},
                     )
-                if delay:
-                    self.stop_event.wait(delay)
 
             self.producer.flush(timeout=60)
         except KafkaError:

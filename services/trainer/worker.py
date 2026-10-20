@@ -36,6 +36,9 @@ from streamcls.spark.session import build_session
 log = get_logger(__name__)
 
 POLL_SECONDS = 5.0
+#: A job running longer than this was orphaned by a killed worker and is put
+#: back in the queue. Retrains take seconds; see Repository.requeue_stale_jobs.
+JOB_LEASE_SECONDS = 120.0
 
 
 class TrainerWorker:
@@ -44,6 +47,10 @@ class TrainerWorker:
         self.repo = Repository(settings.postgres)
         self.stop_event = threading.Event()
         self._spark = None
+        #: The incumbent's loaded pipeline, kept while it stays the incumbent:
+        #: the base model judges the first retrain of every cell.
+        self._incumbent_cache: dict[int, object] = {}
+        self._last_composition: dict[str, int] = {}
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, self._handle_signal)
 
@@ -55,6 +62,8 @@ class TrainerWorker:
         log.info("trainer worker starting", extra={"poll_seconds": POLL_SECONDS})
         while not self.stop_event.is_set():
             try:
+                if requeued := self.repo.requeue_stale_jobs(lease_s=JOB_LEASE_SECONDS):
+                    log.warning("requeued orphaned training jobs", extra={"job_ids": requeued})
                 job = self.repo.claim_training_job()
             except Exception:
                 log.exception("failed to claim a job; retrying")
@@ -91,6 +100,7 @@ class TrainerWorker:
         try:
             config = self.repo.read_config()
             documents, holdout = self._training_corpus(run_id, config)
+            corpus_done = time.monotonic()
             version = f"adapt-run{run_id}-job{job_id}"
 
             result = train(
@@ -102,6 +112,16 @@ class TrainerWorker:
                 holdout=holdout,
                 spark=self.spark,
             )
+            trained = time.monotonic()
+
+            # The model serving the stream right now, scored on the candidate's
+            # own holdout. Always recorded -- it is what makes a decision
+            # auditable afterwards -- and the basis of the decision itself only
+            # under the matched-holdout rule.
+            incumbent_holdout = self._score_incumbent(holdout)
+            scored = time.monotonic()
+            matched = str(config.get("promotion_comparison") or "live") == "matched_holdout"
+
             model_id = register(
                 result,
                 self.settings,
@@ -111,6 +131,19 @@ class TrainerWorker:
                 # The batch the drift fired on: everything from here is the
                 # current concept, and the only fair basis for comparison.
                 since_batch=params.get("batch_id"),
+                incumbent_score=incumbent_holdout if matched else None,
+            )
+            registered = time.monotonic()
+            self.repo.annotate_model(
+                model_id,
+                incumbent_holdout_accuracy=incumbent_holdout,
+                train_composition=self._last_composition,
+                timings={
+                    "corpus_s": round(corpus_done - started, 3),
+                    "fit_evaluate_s": round(trained - corpus_done, 3),
+                    "incumbent_score_s": round(scored - trained, 3),
+                    "register_promote_s": round(registered - scored, 3),
+                },
             )
             self.repo.finish_training_job(job_id, "succeeded", model_version_id=model_id)
             log.info(
@@ -126,6 +159,24 @@ class TrainerWorker:
             log.exception("training job failed", extra={"job_id": job_id})
             self.repo.finish_training_job(job_id, "failed", error=str(error))
 
+    def _score_incumbent(self, holdout: list[Document]) -> float | None:
+        """Accuracy of the active model on ``holdout``, or None if there is neither."""
+        if not holdout:
+            return None
+        record = self.repo.get_active_model()
+        if record is None:
+            return None
+        from pyspark.ml import PipelineModel
+
+        from services.trainer.train import _to_dataframe
+        from streamcls.spark.evaluate import evaluate_predictions
+
+        model = self._incumbent_cache.get(record.id)
+        if model is None:
+            model = PipelineModel.load(record.artifact_path)
+            self._incumbent_cache = {record.id: model}
+        return evaluate_predictions(model.transform(_to_dataframe(self.spark, holdout))).accuracy
+
     def _training_corpus(self, run_id: int, config: dict) -> tuple[list[Document], list[Document]]:
         """Base sample plus a sliding window of recent labelled stream data.
 
@@ -134,6 +185,11 @@ class TrainerWorker:
         useless at everything that did not change. The ratio between the two is
         a knob worth ablating, and it is recorded on the job.
 
+        The holdout is every fifth of the newest ``retrain_holdout_rows`` rows
+        (``retrain_min_new_rows`` by default) even when the training window is
+        shorter than that, so retrains on different amounts of new data are
+        judged on the same holdout.
+
         Honest caveat for the write-up: using ground-truth labels off the stream
         is *labelled-feedback adaptation*, an upper bound on what is achievable
         rather than a deployable method. ``StreamConfig.label_delay_batches``
@@ -141,29 +197,27 @@ class TrainerWorker:
         """
         window_rows = int(config.get("retrain_window_rows", 20_000))
         base_rows = int(config.get("retrain_base_rows", 20_000))
+        holdout_rows = int(config.get("retrain_holdout_rows") or 0) or int(
+            config.get("retrain_min_new_rows", 0)
+        )
 
-        recent = self.repo.recent_labelled_messages(run_id, window_rows)
-        window = [Document(text=text, label=label) for text, label in recent]
+        recent = self.repo.recent_labelled_messages(run_id, max(window_rows, holdout_rows))
+        rows = [Document(text=text, label=label) for text, label in recent]
 
         # The holdout is the only fair basis for deciding whether this model
         # is an improvement, so it is drawn from the current concept -- but
         # interleaved, so the rest of the new concept is trained on.
-        window, holdout = split_retrain_window(
-            window, new_rows=int(config.get("retrain_min_new_rows", 0))
-        )
+        window, holdout = split_retrain_window(rows, new_rows=holdout_rows, train_rows=window_rows)
 
         corpus_dir = Path(self.settings.paths.corpus_dir) / "agnews"
         base = build_splits(corpus_dir).train[:base_rows] if base_rows else []
 
-        log.info(
-            "training corpus assembled",
-            extra={
-                "window_rows": len(window),
-                "holdout_rows": len(holdout),
-                "base_rows": len(base),
-                "run_id": run_id,
-            },
-        )
+        self._last_composition = {
+            "window_rows": len(window),
+            "holdout_rows": len(holdout),
+            "base_rows": len(base),
+        }
+        log.info("training corpus assembled", extra=self._last_composition | {"run_id": run_id})
         return [*base, *window], holdout
 
 
