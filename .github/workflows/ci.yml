@@ -28,7 +28,8 @@ jobs:
       - name: ruff
         run: .venv/bin/ruff check src services web tests
       - name: missing migrations
-        run: .venv/bin/python manage.py makemigrations --check --dry-run
+        # The venv lives at the repo root, one level above working-directory.
+        run: ../.venv/bin/python manage.py makemigrations --check --dry-run
         working-directory: web
 
   unit:
