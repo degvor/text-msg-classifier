@@ -670,6 +670,24 @@ class Repository:
             )
             return [row["id"] for row in cur.fetchall()]
 
+    def requeue_training_job(self, job_id: int, *, reason: str) -> bool:
+        """Put a running job back in the queue after the trainer, not the job,
+        failed (a dead or out-of-memory Spark JVM). Once only: a second such
+        failure of the same job returns False and the caller marks it failed,
+        so a job that itself breaks the JVM cannot loop forever.
+        """
+        with self.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {Table.TRAINING_JOB}
+                SET status = 'queued', started_at = NULL, error = %s
+                WHERE id = %s AND status = 'running' AND error NOT LIKE 'infrastructure:%%'
+                RETURNING id
+                """,
+                (f"infrastructure: {reason}", job_id),
+            )
+            return cur.fetchone() is not None
+
     def claim_training_job(self) -> dict[str, Any] | None:
         """Atomically take the oldest queued job.
 

@@ -39,6 +39,9 @@ POLL_SECONDS = 5.0
 #: A job running longer than this was orphaned by a killed worker and is put
 #: back in the queue. Retrains take seconds; see Repository.requeue_stale_jobs.
 JOB_LEASE_SECONDS = 120.0
+#: The session is rebuilt after this many jobs, between jobs, so that state the
+#: JVM keeps per job cannot accumulate across a matrix of hundreds of retrains.
+SESSION_JOBS = 25
 
 
 class TrainerWorker:
@@ -51,6 +54,7 @@ class TrainerWorker:
         #: the base model judges the first retrain of every cell.
         self._incumbent_cache: dict[int, object] = {}
         self._last_composition: dict[str, int] = {}
+        self._jobs_on_session = 0
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, self._handle_signal)
 
@@ -60,6 +64,7 @@ class TrainerWorker:
 
     def run(self) -> None:
         log.info("trainer worker starting", extra={"poll_seconds": POLL_SECONDS})
+        self._warm_session()
         while not self.stop_event.is_set():
             try:
                 if requeued := self.repo.requeue_stale_jobs(lease_s=JOB_LEASE_SECONDS):
@@ -74,7 +79,13 @@ class TrainerWorker:
                 self.stop_event.wait(POLL_SECONDS)
                 continue
 
+            self._ensure_session()
             self._run_job(job)
+            self._jobs_on_session += 1
+            if self._jobs_on_session >= SESSION_JOBS:
+                log.info("rebuilding the Spark session", extra={"jobs": self._jobs_on_session})
+                self._drop_session()
+                self._warm_session()
         self._shutdown()
 
     @property
@@ -84,11 +95,44 @@ class TrainerWorker:
             self._spark = build_session("trainer-worker", settings=self.settings.spark)
         return self._spark
 
+    def _warm_session(self) -> None:
+        """Start the session now, between jobs, so its start-up time is never
+        counted in a retrain's measured stages."""
+        try:
+            self.spark.range(1).count()
+            log.info("Spark session ready")
+        except Exception:
+            log.exception("could not start a Spark session; the next job will retry")
+            self._drop_session()
+
+    def _drop_session(self) -> None:
+        """Stop the session (if it is still reachable) and forget it."""
+        if self._spark is not None:
+            try:
+                self._spark.stop()
+            except Exception:  # the JVM may already be gone
+                log.warning("stopping a dead Spark session failed; discarding it")
+            self._spark = None
+        self._incumbent_cache = {}
+        self._jobs_on_session = 0
+
+    def _ensure_session(self) -> None:
+        """Rebuild the session if its JVM died between jobs.
+
+        A JVM killed for memory leaves the Python side holding a session whose
+        gateway refuses connections, so every later job failed in a second.
+        """
+        if self._spark is None:
+            return
+        try:
+            self._spark.range(1).count()
+        except Exception:
+            log.warning("Spark session unusable; rebuilding it before the next job")
+            self._drop_session()
+
     def _shutdown(self) -> None:
         self.repo.close()
-        if self._spark is not None:
-            self._spark.stop()
-            self._spark = None
+        self._drop_session()
 
     def _run_job(self, job: dict) -> None:
         job_id = job["id"]
@@ -157,6 +201,14 @@ class TrainerWorker:
             )
         except Exception as error:
             log.exception("training job failed", extra={"job_id": job_id})
+            if _infrastructure_failure(error):
+                # The JVM, not the job, failed: drop the session and put the job
+                # back once, so the retrain runs on a fresh session instead of
+                # being recorded as a failed adaptation.
+                self._drop_session()
+                if self.repo.requeue_training_job(job_id, reason=type(error).__name__):
+                    log.warning("training job requeued after a trainer failure", extra={"job_id": job_id})
+                    return
             self.repo.finish_training_job(job_id, "failed", error=str(error))
 
     def _score_incumbent(self, holdout: list[Document]) -> float | None:
@@ -219,6 +271,15 @@ class TrainerWorker:
         }
         log.info("training corpus assembled", extra=self._last_composition | {"run_id": run_id})
         return [*base, *window], holdout
+
+
+def _infrastructure_failure(error: BaseException) -> bool:
+    """A dead or out-of-memory Spark JVM, as opposed to a problem with the job."""
+    text = f"{type(error).__name__}: {error}"
+    markers = ("Py4JNetworkError", "Py4JError", "ConnectionRefusedError", "Connection refused",
+               "SparkOutOfMemoryError", "UNABLE_TO_ACQUIRE_MEMORY", "OutOfMemoryError",
+               "SparkContext was shut down", "Cannot call methods on a stopped SparkContext")
+    return isinstance(error, ConnectionError) or any(m in text for m in markers)
 
 
 def main() -> int:

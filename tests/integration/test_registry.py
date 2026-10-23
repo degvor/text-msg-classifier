@@ -302,3 +302,24 @@ def test_an_orphaned_running_job_is_requeued_after_its_lease(repo):
     assert job.status == "queued"
     assert job.started_at is None
     assert TrainingJob.objects.get(pk=fresh.pk).status == "running"
+
+
+def test_a_job_failed_by_the_trainer_is_requeued_once(repo):
+    """A dead or out-of-memory JVM is the trainer's failure, not the job's: the
+    job goes back to the queue once, and a second such failure is final, so a
+    job that itself breaks the JVM cannot loop forever."""
+    from dashboard.models import ExperimentRun, TrainingJob
+
+    run = ExperimentRun.objects.create(name="r", seed=1, total_messages=10)
+    job = TrainingJob.objects.create(experiment_run=run, status="running")
+
+    assert repo.requeue_training_job(job.pk, reason="ConnectionRefusedError") is True
+    job.refresh_from_db()
+    assert job.status == "queued"
+    assert job.started_at is None
+    assert job.error.startswith("infrastructure:")
+
+    TrainingJob.objects.filter(pk=job.pk).update(status="running")
+    assert repo.requeue_training_job(job.pk, reason="ConnectionRefusedError") is False
+    job.refresh_from_db()
+    assert job.status == "running"

@@ -36,6 +36,7 @@ within floating-point aggregation noise.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -184,6 +185,7 @@ def train(
 
     owns_session = spark is None
     spark = spark or build_session(f"train-{algorithm}", settings=settings.spark)
+    cached: list = []  # unpersisted on the way out: a reused session would keep them
     try:
         # Only the full splits are cacheable; a --sample run is a smoke test
         # and must not poison the cache with a truncated split.
@@ -204,6 +206,7 @@ def train(
         test_df = _to_dataframe(
             spark, test_docs, cache_path=fixed_cache / "test" if fixed_cache else None
         ).cache()
+        cached += [train_df, val_df, test_df]
         train_rows = train_df.count()
         log.info(
             "fitting",
@@ -221,6 +224,7 @@ def train(
         # Tuned on val, scored once on test. Reporting the tuning set as the
         # headline number is the most common way to overstate a result.
         val_predictions = model.transform(val_df).cache()
+        cached.append(val_predictions)
         val_eval = evaluate_predictions(val_predictions)
         # Confidence reference comes from validation, not training: on training
         # data the model is over-confident, which would set an unreachable bar.
@@ -272,6 +276,12 @@ def train(
             seconds=time.monotonic() - started,
         )
     finally:
+        # The trainer worker reuses one session for every retrain; cached
+        # frames left behind accumulated job after job until the JVM ran out
+        # of memory and died.
+        for frame in cached:
+            with contextlib.suppress(Exception):  # best effort on a dying session
+                frame.unpersist()
         if owns_session:
             spark.stop()
 
